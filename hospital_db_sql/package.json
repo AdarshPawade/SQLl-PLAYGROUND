@@ -1,0 +1,38 @@
+{
+  "name": "hospital-sql-playground",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "server": "node server/index.js",
+    "build": "vite build",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "test": "node test/multiUserIsolation.test.js && node test/qa200Tests.test.js && node test/backendSandbox.test.js && node test/comprehensiveQaSuite.test.js",
+    "test:qa": "node test/comprehensiveQaSuite.test.js",
+    "test:multiuser": "node test/multiUserIsolation.test.js",
+    "test:backend": "node test/backendSandbox.test.js",
+    "test:security": "node test/securitySuite.test.js",
+    "security-scan": "node server/scripts/securityAudit.js",
+    "backup": "node server/scripts/backup.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.7.0",
+    "helmet": "^8.3.0",
+    "lucide-react": "^1.41.0",
+    "mongoose": "^9.10.3",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "sql.js": "^1.14.2"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.1.0",
+    "oxlint": "^1.79.0",
+    "vite": "^8.2.2"
+  }
+}
