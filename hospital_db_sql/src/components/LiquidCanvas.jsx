@@ -33,7 +33,10 @@ export default function LiquidCanvas() {
     ];
 
     let time = 0;
+    let isVisible = typeof document !== 'undefined' ? !document.hidden : true;
+
     const render = () => {
+      if (!isVisible) return;
       time += 0.012;
       ctx.clearRect(0, 0, width, height);
 
@@ -59,10 +62,28 @@ export default function LiquidCanvas() {
       animationFrameId = requestAnimationFrame(render);
     };
 
+    const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) {
+      // Render static frame once and avoid running continuous 60fps animation loop
+      render();
+      cancelAnimationFrame(animationFrameId);
+      return () => window.removeEventListener('resize', handleResize);
+    }
+
+    const handleVisibilityChange = () => {
+      isVisible = !document.hidden;
+      if (isVisible) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = requestAnimationFrame(render);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     render();
 
     return () => {
       window.removeEventListener('resize', handleResize);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       cancelAnimationFrame(animationFrameId);
     };
   }, []);

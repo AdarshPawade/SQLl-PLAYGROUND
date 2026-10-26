@@ -1,6 +1,5 @@
 import assert from 'assert';
 import { sanitizeQuery, executeInSandbox } from '../server/sandbox/sqlSandbox.js';
-import { ALL_CHALLENGES } from '../src/data/challenges.js';
 import { INTERVIEW_CHALLENGES } from '../src/data/interviewPrep.js';
 import { MCQ_QUESTIONS } from '../src/data/mcqData.js';
 
@@ -56,6 +55,14 @@ async function runBackendTests() {
     const userSql = 'SELECT first_name, last_name FROM employees;';
     const expectedSql = 'SELECT first_name, last_name FROM employees;';
     const result = await executeInSandbox(userSql, expectedSql, '', 'employee_db');
+    assert.strictEqual(result.isMatch, true);
+    assert.strictEqual(result.securityAudit, 'SUCCESS');
+  });
+
+  await asyncTest('Sandbox: Executes interview_db schema with compatibility functions', async () => {
+    const userSql = "SELECT curdate() as today, concat('Dept_', department_id) as dept_code FROM employees LIMIT 1;";
+    const expectedSql = "SELECT '2025-01-15' as today, 'Dept_' || department_id as dept_code FROM employees LIMIT 1;";
+    const result = await executeInSandbox(userSql, expectedSql, '', 'interview_db');
     assert.strictEqual(result.isMatch, true);
     assert.strictEqual(result.securityAudit, 'SUCCESS');
   });

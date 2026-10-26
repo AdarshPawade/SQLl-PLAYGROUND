@@ -4,8 +4,7 @@ import {
   LayoutDashboard,
   Menu,
   X,
-  User,
-  ShieldCheck
+  HelpCircle
 } from 'lucide-react';
 
 export default function Header({
@@ -13,7 +12,8 @@ export default function Header({
   onNavigate,
   currentUser,
   sqlDialect = 'mysql',
-  onSwitchDialect
+  onSwitchDialect,
+  onOpenOnboarding
 }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -143,6 +143,20 @@ export default function Header({
                 )}
               </button>
             </div>
+
+            {/* Quick Tour Button */}
+            {onOpenOnboarding && (
+              <button
+                type="button"
+                className="header-tour-btn"
+                onClick={onOpenOnboarding}
+                title="Quick Onboarding Tour"
+                aria-label="Quick Onboarding Tour"
+              >
+                <HelpCircle className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="tour-label">Tour</span>
+              </button>
+            )}
 
             {/* Subtle Divider */}
             <div className="header-v-divider" />

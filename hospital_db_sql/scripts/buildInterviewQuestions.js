@@ -1,5 +1,4 @@
 import fs from 'fs';
-import path from 'path';
 
 // Load user uploaded JSON
 const userJsonPath = 'C:\\Users\\Tushar kamore\\.gemini\\antigravity-ide\\brain\\94f65021-0ccb-49a2-975b-efbd421e8d69\\.user_uploaded\\media_1791645939971.json';
@@ -11,7 +10,6 @@ console.log(`Loaded ${data.questions.length} questions from user JSON.`);
 // Transform and generate MySQL and PostgreSQL versions for each question
 const questions = data.questions.map((q, idx) => {
   const num = idx + 1;
-  const numStr = String(num).padStart(3, '0');
   
   // Create MySQL equivalent of reference_sql
   let mysqlSql = q.reference_sql

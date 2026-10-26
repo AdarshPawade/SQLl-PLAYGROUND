@@ -3,32 +3,32 @@ import { logger } from '../utils/logger.js';
 // Requirement 3: Web Application Firewall (WAF) Threat Vectors & Signatures
 const WAF_THREAT_PATTERNS = [
   // Cross-Site Scripting (XSS)
-  /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
-  /javascript:/gi,
-  /onerror\s*=/gi,
-  /onload\s*=/gi,
-  /onclick\s*=/gi,
-  /<iframe/gi,
-  /<object/gi,
-  /<embed/gi,
+  /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/i,
+  /javascript:/i,
+  /onerror\s*=/i,
+  /onload\s*=/i,
+  /onclick\s*=/i,
+  /<iframe/i,
+  /<object/i,
+  /<embed/i,
   
   // SQL Injection (Outside sandboxed SQL playground queries)
-  /UNION\s+ALL\s+SELECT/gi,
-  /INFORMATION_SCHEMA/gi,
-  /WAITFOR\s+DELAY/gi,
-  /BENCHMARK\(\d+,\s*md5\(/gi,
+  /UNION\s+ALL\s+SELECT/i,
+  /INFORMATION_SCHEMA/i,
+  /WAITFOR\s+DELAY/i,
+  /BENCHMARK\(\d+,\s*md5\(/i,
   
   // Remote Code Execution & Command Injection
-  /;\s*cat\s+/gi,
-  /;\s*rm\s+/gi,
-  /\|\s*bash/gi,
-  /`[^`]*`/g,
+  /;\s*cat\s+/i,
+  /;\s*rm\s+/i,
+  /\|\s*bash/i,
+  /`[^`]*`/,
   
   // Path Traversal
-  /\.\.\//g,
-  /\.\.\\/g,
-  /%2e%2e%2f/gi,
-  /%2e%2e\//gi
+  /\.\.\//,
+  /\.\.\\/,
+  /%2e%2e%2f/i,
+  /%2e%2e\//i
 ];
 
 /**

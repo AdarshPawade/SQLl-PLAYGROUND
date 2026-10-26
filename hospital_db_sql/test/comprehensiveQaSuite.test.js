@@ -56,10 +56,10 @@ function registerCompatibilityFunctions(db) {
     });
     db.create_function('now', () => '2025-01-15 12:00:00');
     db.create_function('curdate', () => '2025-01-15');
-    db.create_function('date_format', (d, fmt) => d ? d.substring(0, 7) + '-01' : null);
+    db.create_function('date_format', (d, _fmt) => d ? d.substring(0, 7) + '-01' : null);
     db.create_function('concat', (...args) => args.join(''));
     db.create_function('if', (c, a, b) => c ? a : b);
-  } catch (e) {}
+  } catch {}
 }
 
 function executeQueryNode(db, sqlQuery) {

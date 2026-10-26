@@ -2,13 +2,15 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Lock, User, Mail, Key, ShieldCheck, CheckCircle2, AlertCircle, 
   LogOut, RefreshCw, Trophy, UserCheck, HelpCircle,
-  Sparkles, Layers, Database
+  Sparkles, Layers
 } from 'lucide-react';
 import { 
   registerUser, authenticateUser, resetPassword, getActiveSession, 
-  clearActiveSession, getUserProgress, saveUserProgress 
+  clearActiveSession, getUserProgress 
 } from '../utils/cryptoAuth.js';
+import { registerApi, loginApi, syncProgressApi, logoutApi } from '../services/api.js';
 import './AuthSystem.css';
+
 
 /**
  * LiquidGL Background Canvas
@@ -80,9 +82,19 @@ function LiquidGLCanvas() {
 }
 
 export default function AuthSystem({ onSessionChange }) {
-  const [activeTab, setActiveTab] = useState('login'); // 'login' | 'signup' | 'forgot' | 'dashboard'
-  const [currentUser, setCurrentUser] = useState(null);
-  const [userProgress, setUserProgress] = useState(null);
+  const [currentUser, setCurrentUser] = useState(() => getActiveSession());
+  const [activeTab, setActiveTab] = useState(() => getActiveSession() ? 'dashboard' : 'login');
+  const [userProgress, setUserProgress] = useState(() => {
+    const session = getActiveSession();
+    const userKey = session?.username || 'guest';
+    return getUserProgress(userKey) || {
+      completedChallenges: [],
+      unlockedProgress: {
+        employee_db: { Beginner: 0, Intermediate: 0, Pro: 0 },
+        hospital_db: { Beginner: 0, Intermediate: 0, Pro: 0 }
+      }
+    };
+  });
 
   // Form States
   const [loginForm, setLoginForm] = useState({ usernameOrEmail: '', password: '' });
@@ -117,19 +129,6 @@ export default function AuthSystem({ onSessionChange }) {
     setUserProgress(prog);
   }, []);
 
-  // Check active session on mount
-  useEffect(() => {
-    const session = getActiveSession();
-    if (session) {
-      setCurrentUser(session);
-      loadUserProgress(session.username);
-      setActiveTab('dashboard');
-      if (onSessionChange) onSessionChange(session);
-    } else {
-      loadUserProgress('guest');
-    }
-  }, [loadUserProgress, onSessionChange]);
-
   const handleAlert = (type, text) => {
     setMessage({ type, text });
     setTimeout(() => setMessage({ type: '', text: '' }), 6000);
@@ -152,6 +151,18 @@ export default function AuthSystem({ onSessionChange }) {
       return handleAlert('error', 'Password must be at least 8 characters long.');
     }
 
+    // Try cloud backend registration first
+    try {
+      await registerApi({
+        username: signupForm.username,
+        email: signupForm.email,
+        password: signupForm.password,
+        fullName: signupForm.username
+      });
+    } catch {
+      // Fallback continues locally
+    }
+
     const res = await registerUser({
       username: signupForm.username,
       email: signupForm.email,
@@ -172,13 +183,23 @@ export default function AuthSystem({ onSessionChange }) {
     }
   };
 
-  // Login Handler
+  // Login Handler with Cloud Sync Bridge
   const handleLogin = async (e) => {
     e.preventDefault();
     setMessage({ type: '', text: '' });
 
     if (!loginForm.usernameOrEmail || !loginForm.password) {
       return handleAlert('error', 'Please enter your username/email and password.');
+    }
+
+    // Attempt Backend Cloud Authentication
+    try {
+      await loginApi({
+        usernameOrEmail: loginForm.usernameOrEmail,
+        password: loginForm.password
+      });
+    } catch {
+      // Fallback continues locally
     }
 
     const res = await authenticateUser(loginForm.usernameOrEmail, loginForm.password);
@@ -188,6 +209,14 @@ export default function AuthSystem({ onSessionChange }) {
       setActiveTab('dashboard');
       handleAlert('success', `Welcome back, ${res.user.displayName || res.user.username}!`);
       if (onSessionChange) onSessionChange(res.user);
+
+      // Auto-sync guest progress to cloud account
+      try {
+        const guestProg = getUserProgress('guest');
+        if (guestProg && (guestProg.completedChallenges?.length > 0 || guestProg.unlockedProgress)) {
+          syncProgressApi(guestProg).catch(() => {});
+        }
+      } catch {}
     } else {
       handleAlert('error', res.error);
     }
@@ -223,6 +252,7 @@ export default function AuthSystem({ onSessionChange }) {
 
   // Logout Handler
   const handleLogout = () => {
+    logoutApi().catch(() => {});
     clearActiveSession();
     setCurrentUser(null);
     setUserProgress(null);
@@ -230,6 +260,7 @@ export default function AuthSystem({ onSessionChange }) {
     handleAlert('success', 'Logged out safely. Client-side session cleared.');
     if (onSessionChange) onSessionChange(null);
   };
+
 
   return (
     <div className="auth-system-container">

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Lock, CheckCircle2, PlayCircle, ListOrdered, Award, Filter, Trophy } from 'lucide-react';
+import { Lock, CheckCircle2, PlayCircle, ListOrdered, Award, Trophy } from 'lucide-react';
 
 export default function QuestionSidebar({
   questions = [],
@@ -94,7 +94,7 @@ export default function QuestionSidebar({
       )}
 
       <div className="questions-list">
-        {filteredQuestions.map((q, index) => {
+        {filteredQuestions.map((q) => {
           const originalIndex = questions.findIndex(orig => orig.id === q.id);
           const isUnlocked = isInterviewMode ? true : originalIndex <= unlockedProgress;
           const isSolved = solvedQuestionIds.has(q.id);

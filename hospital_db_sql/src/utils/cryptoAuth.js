@@ -214,7 +214,7 @@ export function getActiveSession() {
     const storage = getStorage();
     const data = storage.getItem(SESSION_STORAGE_KEY);
     return data ? JSON.parse(data) : null;
-  } catch (e) {
+  } catch {
     return null;
   }
 }

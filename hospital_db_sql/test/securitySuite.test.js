@@ -1,9 +1,8 @@
 import assert from 'assert';
 import http from 'http';
-import path from 'path';
 import fs from 'fs';
 import { validatePasswordStrength, generate2FASecret, verify2FAToken, hasPermission, ROLES } from '../server/utils/auth.js';
-import { sanitizeData, logger } from '../server/utils/logger.js';
+import { sanitizeData } from '../server/utils/logger.js';
 import { createEncryptedBackup, restoreEncryptedBackup } from '../server/scripts/backup.js';
 import { runSastScan } from '../server/scripts/securityAudit.js';
 import { validateAndSanitizeInput, enforceLeastPrivilege, inspectWafSqliSignatures } from '../server/utils/sqlSecurity.js';
@@ -102,10 +101,15 @@ async function runSecuritySuite() {
     assert.strictEqual(pragmaCheck.allowed, false);
   });
 
-  // 6. SQL Injection Defense: WAF Edge Signatures
-  test('SQLi Defense: WAF Edge Engine detects UNION SELECT, OR 1=1, and SLEEP() attack patterns', () => {
-    const unionAttack = inspectWafSqliSignatures("SELECT * FROM users WHERE id = 1 UNION SELECT 1, 2, password FROM admin");
-    assert.strictEqual(unionAttack.safe, false);
+  // 6. SQL Injection Defense: WAF Edge Signatures & Concurrency/Statelessness
+  test('SQLi Defense: WAF Edge Engine detects UNION SELECT, OR 1=1, and SLEEP() attack patterns reliably', () => {
+    const unionPayload = "SELECT * FROM users WHERE id = 1 UNION SELECT 1, 2, password FROM admin";
+    const unionAttack1 = inspectWafSqliSignatures(unionPayload);
+    assert.strictEqual(unionAttack1.safe, false);
+
+    // Repeat check on same pattern: Must STILL block (verifies regex is stateless, no lastIndex leakage)
+    const unionAttack2 = inspectWafSqliSignatures(unionPayload);
+    assert.strictEqual(unionAttack2.safe, false, 'WAF regex must remain stateless across consecutive calls');
 
     const booleanAttack = inspectWafSqliSignatures("SELECT * FROM users WHERE name = 'admin' OR '1'='1'");
     assert.strictEqual(booleanAttack.safe, false);
@@ -214,6 +218,7 @@ async function runSecuritySuite() {
   console.log(`====================================================\n`);
 
   if (failed > 0) process.exit(1);
+  process.exit(0);
 }
 
 runSecuritySuite();

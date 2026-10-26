@@ -119,16 +119,16 @@ export function enforceLeastPrivilege(sqlQuery, userRole = 'APP_USER') {
  * 4. Web Application Firewall (WAF) Edge Signatures for SQL Injection
  */
 export const WAF_SQLI_PATTERNS = [
-  /UNION\s+(?:ALL\s+)?SELECT/gi,
-  /OR\s+['"]?1['"]?\s*=\s*['"]?1/gi,
-  /AND\s+['"]?1['"]?\s*=\s*['"]?1/gi,
-  /WAITFOR\s+DELAY/gi,
-  /BENCHMARK\(\d+,\s*md5\(/gi,
-  /SLEEP\(\d+\)/gi,
-  /\/\*!\d+.*?\*\//gi, // Inline MySQL conditional comments
-  /;\s*DROP\s+TABLE/gi,
-  /;\s*DELETE\s+FROM/gi,
-  /0x[0-9a-fA-F]+/gi // Hexadecimal string payloads
+  /UNION\s+(?:ALL\s+)?SELECT/i,
+  /OR\s+['"]?1['"]?\s*=\s*['"]?1/i,
+  /AND\s+['"]?1['"]?\s*=\s*['"]?1/i,
+  /WAITFOR\s+DELAY/i,
+  /BENCHMARK\(\d+,\s*md5\(/i,
+  /SLEEP\(\d+\)/i,
+  /\/\*!\d+.*?\*\//i, // Inline MySQL conditional comments
+  /;\s*DROP\s+TABLE/i,
+  /;\s*DELETE\s+FROM/i,
+  /0x[0-9a-fA-F]+/i // Hexadecimal string payloads
 ];
 
 export function inspectWafSqliSignatures(inputString) {

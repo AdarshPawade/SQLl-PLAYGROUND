@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, Zap, Flame, CheckCircle, ArrowRight, Activity, Database, Layers } from 'lucide-react';
+import { ShieldCheck, Zap, Flame, CheckCircle, ArrowRight, Database, Layers } from 'lucide-react';
 
 export default function LevelSelector({ activeDbKey, challengesForActiveDb, onSelectLevel, progressMap }) {
   const isEmployeeDb = activeDbKey === 'employee_db';

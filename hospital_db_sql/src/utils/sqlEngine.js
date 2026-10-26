@@ -42,10 +42,10 @@ export function registerCompatibilityFunctions(db) {
     });
     db.create_function('now', () => '2025-01-15 12:00:00');
     db.create_function('curdate', () => '2025-01-15');
-    db.create_function('date_format', (d, fmt) => d ? d.substring(0, 7) + '-01' : null);
+    db.create_function('date_format', (d, _fmt) => d ? d.substring(0, 7) + '-01' : null);
     db.create_function('concat', (...args) => args.join(''));
     db.create_function('if', (c, a, b) => c ? a : b);
-  } catch (e) {
+  } catch {
     // Ignore duplicate function creation
   }
 }
@@ -138,6 +138,9 @@ export function validateUserQuery(sessionDb, userQuery, expectedQuery, verificat
     };
   }
 
+  let userDb = null;
+  let expectedDb = null;
+
   try {
     // 1. Always evaluate user query against clean baseline DB instance for active schema
     let baseInitSql = EMPLOYEE_INITIAL_SQL;
@@ -159,7 +162,7 @@ export function validateUserQuery(sessionDb, userQuery, expectedQuery, verificat
     }
 
     // 2. Instantiate clean User DB evaluation instance
-    const userDb = new cachedSQL.Database();
+    userDb = new cachedSQL.Database();
     userDb.run('PRAGMA case_sensitive_like = OFF;');
     registerCompatibilityFunctions(userDb);
     userDb.run(baseInitSql);
@@ -176,7 +179,7 @@ export function validateUserQuery(sessionDb, userQuery, expectedQuery, verificat
     }
 
     // 3. Instantiate clean Expected DB evaluation instance
-    const expectedDb = new cachedSQL.Database();
+    expectedDb = new cachedSQL.Database();
     expectedDb.run('PRAGMA case_sensitive_like = OFF;');
     registerCompatibilityFunctions(expectedDb);
     expectedDb.run(baseInitSql);
@@ -272,6 +275,14 @@ export function validateUserQuery(sessionDb, userQuery, expectedQuery, verificat
       expectedResult: null,
       message: `Execution Error: ${err.message}`
     };
+  } finally {
+    // Explicitly release WebAssembly linear memory allocations
+    if (userDb && typeof userDb.close === 'function') {
+      try { userDb.close(); } catch {}
+    }
+    if (expectedDb && typeof expectedDb.close === 'function') {
+      try { expectedDb.close(); } catch {}
+    }
   }
 }
 

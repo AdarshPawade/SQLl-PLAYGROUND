@@ -1,0 +1,76 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sql_playground_app
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://mongo:27017/sql_playground
+      - ALLOWED_ORIGINS=http://localhost:5000,http://localhost:3000,http://localhost:5173
+      - JWT_SECRET=sql_playground_enterprise_secret_key_2025_super_secure
+      - DISABLE_FILE_LOGS=true
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - sql_internal_net
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:5000/api/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2048M
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  mongo:
+    image: mongo:7-jammy
+    container_name: sql_playground_mongo
+    restart: unless-stopped
+    # Internal to Docker network only; not exposed to public internet
+    networks:
+      - sql_internal_net
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2048M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+volumes:
+  mongo_data:
+
+networks:
+  sql_internal_net:
+    driver: bridge

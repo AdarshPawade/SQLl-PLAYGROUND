@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle, AlertTriangle, XCircle, Clock } from 'lucide-react';
+import { Clock } from 'lucide-react';
 
 export default function ValidationResults({ validationResult, userQueryExecuted }) {
   if (!userQueryExecuted || !validationResult) {

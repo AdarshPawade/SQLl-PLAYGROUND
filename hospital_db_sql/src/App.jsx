@@ -8,7 +8,9 @@ import SchemaSidebar from './components/SchemaSidebar';
 import AuthSystem from './components/AuthSystem';
 import Footer from './components/Footer';
 import LiquidCanvas from './components/LiquidCanvas';
+import OnboardingModal from './components/OnboardingModal';
 import { Code2, ListOrdered, Database } from 'lucide-react';
+
 import { getActiveSession, getUserProgress, saveUserProgress } from './utils/cryptoAuth.js';
 
 import {
@@ -30,6 +32,15 @@ export default function App() {
   // Active Session & User Authentication State
   const [currentUser, setCurrentUser] = useState(() => getActiveSession());
 
+  // Interactive Onboarding Modal (Auto-shown on first visit)
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(() => {
+    try {
+      return !localStorage.getItem('sql_playground_onboarded_v1');
+    } catch {
+      return false;
+    }
+  });
+
   // Mobile Practice View Sub-Tab ('editor', 'questions', 'schema')
   const [mobilePracticeTab, setMobilePracticeTab] = useState('editor');
 
@@ -38,16 +49,27 @@ export default function App() {
 
   // Database Instance & Loaded State
   const [dbInstance, setDbInstance] = useState(null);
-  const [dbLoaded, setDbLoaded] = useState(false);
+  const [loadedDbKey, setLoadedDbKey] = useState(null);
+  const dbLoaded = Boolean(dbInstance && loadedDbKey === activeDbKey);
 
   // Progressive Unlocking State per database & per level
-  const [unlockedProgressMap, setUnlockedProgressMap] = useState({
-    employee_db: { Beginner: 0, Intermediate: 0, Pro: 0 },
-    hospital_db: { Beginner: 0, Intermediate: 0, Pro: 0 }
+  const [unlockedProgressMap, setUnlockedProgressMap] = useState(() => {
+    const session = getActiveSession();
+    const userKey = session?.username || 'guest';
+    const prog = getUserProgress(userKey);
+    return prog?.unlockedProgress || {
+      employee_db: { Beginner: 0, Intermediate: 0, Pro: 0 },
+      hospital_db: { Beginner: 0, Intermediate: 0, Pro: 0 }
+    };
   });
 
   // Set of solved question IDs across session
-  const [solvedQuestionIds, setSolvedQuestionIds] = useState(new Set());
+  const [solvedQuestionIds, setSolvedQuestionIds] = useState(() => {
+    const session = getActiveSession();
+    const userKey = session?.username || 'guest';
+    const prog = getUserProgress(userKey);
+    return new Set(prog?.completedChallenges || []);
+  });
 
   // Active Question & User SQL
   const [selectedLevel, setSelectedLevel] = useState('Beginner');
@@ -81,13 +103,6 @@ export default function App() {
     }
   };
 
-  // Sync session and progress on mount
-  useEffect(() => {
-    const session = getActiveSession();
-    setCurrentUser(session);
-    loadProgressForSession(session);
-  }, []);
-
   // Handle User Login / Logout / Switch Account
   const handleSessionChange = (newSession) => {
     setCurrentUser(newSession);
@@ -97,21 +112,33 @@ export default function App() {
     setUserQueryExecuted(false);
   };
 
-  // Initialize SQLite DB for active schema
-  const initDbForSchema = async (dbKey) => {
-    setDbLoaded(false);
-    try {
-      const db = await createHospitalDatabase(dbKey);
-      setDbInstance(db);
-      setDbLoaded(true);
-    } catch (err) {
-      console.error('Failed to initialize SQLite WASM:', err);
-    }
-  };
-
-  // Re-init DB when activeDbKey changes
+  // Re-init DB when activeDbKey changes (with async race condition safeguard and WASM disposal)
   useEffect(() => {
-    initDbForSchema(activeDbKey);
+    let isCancelled = false;
+
+    createHospitalDatabase(activeDbKey)
+      .then((newDb) => {
+        if (isCancelled) {
+          try { newDb.close(); } catch {}
+          return;
+        }
+        setDbInstance((prevDb) => {
+          if (prevDb && typeof prevDb.close === 'function') {
+            try { prevDb.close(); } catch {}
+          }
+          return newDb;
+        });
+        setLoadedDbKey(activeDbKey);
+      })
+      .catch((err) => {
+        if (!isCancelled) {
+          console.error('Failed to initialize SQLite WASM:', err);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
   }, [activeDbKey]);
 
   // Handle switching database schema
@@ -152,6 +179,20 @@ export default function App() {
     setValidationResult(null);
     setUserQueryExecuted(false);
   };
+
+  // Handle Guided Onboarding Track Selection
+  const handleSelectTrack = (trackKey) => {
+    if (trackKey === 'healthcare') {
+      handleSwitchDatabase('hospital_db');
+      handleNavigate('beginner');
+    } else if (trackKey === 'interview') {
+      handleNavigate('interview');
+    } else {
+      handleSwitchDatabase('employee_db');
+      handleNavigate('beginner');
+    }
+  };
+
 
   const handleSelectLevel = (levelKey) => {
     setSelectedLevel(levelKey);
@@ -308,6 +349,7 @@ export default function App() {
         currentUser={currentUser}
         sqlDialect={sqlDialect}
         onSwitchDialect={setSqlDialect}
+        onOpenOnboarding={() => setIsOnboardingOpen(true)}
       />
 
       {/* VIEW ROUTING */}
@@ -411,6 +453,12 @@ export default function App() {
           }}
         />
       )}
+      <OnboardingModal
+        isOpen={isOnboardingOpen}
+        onClose={() => setIsOnboardingOpen(false)}
+        onSelectTrack={handleSelectTrack}
+        onOpenAuth={() => handleNavigate('auth')}
+      />
       <Footer />
     </div>
   );

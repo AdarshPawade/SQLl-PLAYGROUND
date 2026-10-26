@@ -9,4 +9,8 @@ const savedQuerySchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
+// High-speed lookup index for 1,000+ users
+savedQuerySchema.index({ userId: 1, createdAt: -1 });
+
 export const SavedQuery = mongoose.models.SavedQuery || mongoose.model('SavedQuery', savedQuerySchema);
+

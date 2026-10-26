@@ -30,7 +30,7 @@ router.post('/', async (req, res) => {
         ip: req.ip
       }).catch(() => {});
     }
-  } catch (e) {
+  } catch {
     // Ignore audit log error if db offline
   }
 

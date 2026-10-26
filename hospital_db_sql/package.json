@@ -9,15 +9,17 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test": "node test/multiUserIsolation.test.js && node test/qa200Tests.test.js && node test/backendSandbox.test.js && node test/comprehensiveQaSuite.test.js",
+    "test": "node test/multiUserIsolation.test.js && node test/qa200Tests.test.js && node test/backendSandbox.test.js && node test/comprehensiveQaSuite.test.js && node test/authOnboarding.test.js && node test/securitySuite.test.js",
     "test:qa": "node test/comprehensiveQaSuite.test.js",
     "test:multiuser": "node test/multiUserIsolation.test.js",
     "test:backend": "node test/backendSandbox.test.js",
     "test:security": "node test/securitySuite.test.js",
+    "test:auth": "node test/authOnboarding.test.js",
     "security-scan": "node server/scripts/securityAudit.js",
     "backup": "node server/scripts/backup.js"
   },
   "dependencies": {
+    "compression": "^1.8.2",
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "express-rate-limit": "^8.7.0",

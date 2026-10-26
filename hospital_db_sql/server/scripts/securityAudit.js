@@ -17,29 +17,29 @@ export function runSastScan(targetDir = process.cwd()) {
       id: 'SEC-001',
       severity: 'HIGH',
       name: 'Hardcoded Secret or Credentials',
-      pattern: /(?:password|secret|api_key|private_key)\s*[:=]\s*["'][a-zA-Z0-9_\-]{8,}["']/i,
+      pattern: /(?:password|secret|api_key|private_key)\s*[:=]\s*["'][a-zA-Z0-9_-]{8,}["']/i,
       excludeFiles: ['securityAudit.js', 'test/securitySuite.test.js', 'auth.js']
     },
     {
       id: 'SEC-002',
       severity: 'CRITICAL',
       name: 'Insecure eval() or Function Constructor',
-      pattern: /\beval\(|\bnew\s+Function\(/g,
-      excludeFiles: ['sqlSandbox.js'] // Allowed inside sql.js WASM bridge
+      pattern: /\beval\(|\bnew\s+Function\(/,
+      excludeFiles: ['securityAudit.js', 'sqlSandbox.js', 'test/securitySuite.test.js'] // Allowed inside sql.js WASM bridge
     },
     {
       id: 'SEC-003',
       severity: 'MEDIUM',
       name: 'Insecure Math.random() Usage for Security Tokens',
-      pattern: /Math\.random\(\)/g,
-      excludeFiles: []
+      pattern: /Math\.random\(\)/,
+      excludeFiles: ['securityAudit.js', 'test/securitySuite.test.js']
     },
     {
       id: 'SEC-004',
       severity: 'HIGH',
       name: 'Dangerous HTML Injection / innerHTML',
-      pattern: /dangerouslySetInnerHTML|\.innerHTML\s*=/g,
-      excludeFiles: []
+      pattern: /dangerouslySetInnerHTML|\.innerHTML\s*=/,
+      excludeFiles: ['securityAudit.js', 'test/securitySuite.test.js']
     }
   ];
 

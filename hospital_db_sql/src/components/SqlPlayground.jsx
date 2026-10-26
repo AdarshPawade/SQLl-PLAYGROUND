@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Play, HelpCircle, RotateCcw, CheckCircle, Code2, 
-  Terminal, Database, Sparkles, Eye, Copy, Check 
+  Terminal, Database, Eye, Copy, Check 
 } from 'lucide-react';
 import ValidationResults from './ValidationResults';
 

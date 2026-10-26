@@ -26,7 +26,7 @@ export function sanitizeData(data) {
     // Redact JWT tokens
     let sanitized = data.replace(/eyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/g, '[REDACTED_JWT_TOKEN]');
     // Redact Bearer tokens
-    sanitized = sanitized.replace(/Bearer\s+[a-zA-Z0-9_\-\.]+/gi, 'Bearer [REDACTED_TOKEN]');
+    sanitized = sanitized.replace(/Bearer\s+[a-zA-Z0-9_.-]+/gi, 'Bearer [REDACTED_TOKEN]');
     // Redact API keys / secrets in key=value or "key": "value"
     sanitized = sanitized.replace(/(password|secret|token|apiKey|api_key|ssn)\s*[:=]\s*["']?[^"'\s,&]+/gi, '$1=[REDACTED]');
     return sanitized;
@@ -61,7 +61,7 @@ class SecureLogger {
     if (!fs.existsSync(this.logDir)) {
       try {
         fs.mkdirSync(this.logDir, { recursive: true });
-      } catch (err) {
+      } catch {
         // Fallback if directory creation fails
       }
     }
@@ -105,11 +105,13 @@ class SecureLogger {
   }
 
   writeToFile(filename, data) {
+    if (process.env.DISABLE_FILE_LOGS === 'true') return;
     try {
       const filePath = path.join(this.logDir, filename);
-      fs.appendFileSync(filePath, data + '\n', 'utf8');
-    } catch (err) {
-      // Ignore file append errors in read-only environments
+      // Non-blocking asynchronous file append
+      fs.appendFile(filePath, data + '\n', 'utf8', () => {});
+    } catch {
+      // Ignore file append errors in read-only / ephemeral environments
     }
   }
 }

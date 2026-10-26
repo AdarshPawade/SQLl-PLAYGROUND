@@ -1,5 +1,3 @@
-import initSqlJs from 'sql.js';
-
 // Test runner for 50 Hard Interview Questions
 const INTERVIEW_INITIAL_SQL = `
 DROP TABLE IF EXISTS salary_history;
