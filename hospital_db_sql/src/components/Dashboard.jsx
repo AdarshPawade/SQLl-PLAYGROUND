@@ -6,12 +6,11 @@ import {
   ArrowRight,
   Sparkles,
   Database,
-  Server,
+  Activity,
   Briefcase,
   Terminal,
   CheckCircle2,
-  Trophy,
-  ArrowRightLeft
+  Trophy
 } from 'lucide-react';
 
 export default function Dashboard({
@@ -104,61 +103,51 @@ export default function Dashboard({
 
   return (
     <div className="enterprise-dashboard">
-      {/* Hero Banner with Animated 2-Option Selector & Circular Progress Tracker */}
+      {/* Hero Banner with Direct DB Selector & Circular Progress Tracker */}
       <div className="hero-control-panel hero-control-panel-with-tracker">
         <div className="panel-left-content">
           <div className="hero-status-tag font-mono">
             <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
-            <span>DUAL RELATIONAL SCHEMAS • ENTERPRISE & CLINICAL IoT</span>
+            <span>DUAL SCHEMAS • ENTERPRISE & CLINICAL</span>
           </div>
 
           <h1 className="hero-heading">
-            Interactive <span className="hero-gradient-text">SQL Practice Studio</span>
+            Interactive <span className="hero-gradient-text">SQL Studio</span>
           </h1>
           <p className="hero-description">
-            Execute real queries against two full-scale production schemas: <strong>Employee HR Management</strong> (payroll, staff hierarchy, cross-department projects) and <strong>Hospital Clinical IoT</strong> (patient admissions, physicians, smart hardware telemetry). Verified across MySQL 8.0 & PostgreSQL with zero setup.
+            Execute real queries against two production schemas: <strong>Employee HR</strong> and <strong>Hospital Clinical</strong> with MySQL & PostgreSQL engine support.
           </p>
 
           <div className="hero-schema-highlights font-mono">
             <div className="highlight-item">
               <Database className="w-3.5 h-3.5 text-emerald-500" />
-              <span>Employee DB: 5 Tables • Corporate Hierarchy</span>
+              <span>Employee DB (5 Tables)</span>
             </div>
             <div className="highlight-item">
-              <Server className="w-3.5 h-3.5 text-cyan-500" />
-              <span>Hospital DB: 5 Tables • Clinical Telemetry</span>
+              <Activity className="w-3.5 h-3.5 text-cyan-500" />
+              <span>Hospital DB (5 Tables)</span>
             </div>
             <div className="highlight-item">
               <Terminal className="w-3.5 h-3.5 text-purple-500" />
-              <span>210 Solved Scenarios • MySQL & PostgreSQL Engine</span>
+              <span>210 Challenges • Zero Setup</span>
             </div>
           </div>
 
           <div className="dataset-picker-bar">
-            <span className="picker-label">ACTIVE DATABASE:</span>
-            <div className="segmented-selector animated-two-option-selector" role="group" aria-label="Select Database">
+            <span className="picker-label">DATABASE:</span>
+            <div className="dashboard-db-toggle-group" role="group" aria-label="Select Database">
               {/* Option 1: Employee Database */}
               <button
                 type="button"
-                className={`two-option-btn ${isEmployeeDb ? 'is-active is-default' : 'is-inactive'}`}
+                className={`dashboard-db-btn ${isEmployeeDb ? 'active db-employee' : ''}`}
                 onClick={() => onSwitchDatabase('employee_db')}
-                title={isEmployeeDb ? "Employee Database is active. Hover to reveal Hospital DB." : "Switch to Employee Database"}
+                title="Switch to Employee Database"
               >
                 <Database className="w-4 h-4" />
-                <span className="btn-label-text">Employee Database</span>
-                {isEmployeeDb ? (
-                  <>
-                    <span className="option-state-pill default-active-pill">
-                      <span className="state-pulse-dot" />
-                      DEFAULT
-                    </span>
-                    <span className="hover-expand-hint font-mono">
-                      <ArrowRightLeft className="w-3 h-3 inline mr-1" /> Hover to switch
-                    </span>
-                  </>
-                ) : (
-                  <span className="hover-out-indicator">
-                    Switch to Employee DB &rarr;
+                <span className="btn-label-text">Employee DB</span>
+                {isEmployeeDb && (
+                  <span className="db-active-indicator font-mono">
+                    <span className="state-pulse-dot" /> ACTIVE
                   </span>
                 )}
               </button>
@@ -166,25 +155,15 @@ export default function Dashboard({
               {/* Option 2: Hospital Database */}
               <button
                 type="button"
-                className={`two-option-btn ${!isEmployeeDb ? 'is-active' : 'is-inactive'}`}
+                className={`dashboard-db-btn ${!isEmployeeDb ? 'active db-hospital' : ''}`}
                 onClick={() => onSwitchDatabase('hospital_db')}
-                title={!isEmployeeDb ? "Hospital Database is active. Hover to reveal Employee DB." : "Switch to Hospital Database"}
+                title="Switch to Hospital Database"
               >
-                <Server className="w-4 h-4" />
-                <span className="btn-label-text">Hospital Database</span>
-                {!isEmployeeDb ? (
-                  <>
-                    <span className="option-state-pill active-pill">
-                      <span className="state-pulse-dot" />
-                      ACTIVE
-                    </span>
-                    <span className="hover-expand-hint font-mono">
-                      <ArrowRightLeft className="w-3 h-3 inline mr-1" /> Hover to switch
-                    </span>
-                  </>
-                ) : (
-                  <span className="hover-out-indicator">
-                    Switch to Hospital DB &rarr;
+                <Activity className="w-4 h-4" />
+                <span className="btn-label-text">Hospital DB</span>
+                {!isEmployeeDb && (
+                  <span className="db-active-indicator font-mono">
+                    <span className="state-pulse-dot" /> ACTIVE
                   </span>
                 )}
               </button>
@@ -259,9 +238,9 @@ export default function Dashboard({
         <div className="section-title-bar">
           <div className="section-title-row">
             <h2 className="grid-section-title">Practice Modules</h2>
-            <span className="grid-section-counter font-mono">4 MODULES AVAILABLE</span>
+            <span className="grid-section-counter font-mono">4 TRACKS</span>
           </div>
-          <span className="grid-section-subtitle">Select a module to begin practicing in the interactive SQL workspace.</span>
+          <span className="grid-section-subtitle">Select a track to start practicing.</span>
         </div>
 
         {/* Core Progression Modules (3-column grid) */}

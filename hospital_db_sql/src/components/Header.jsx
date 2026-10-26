@@ -4,10 +4,15 @@ import {
   LayoutDashboard,
   Menu,
   X,
-  HelpCircle
+  Sparkles,
+  Activity,
+  Code2,
+  Briefcase
 } from 'lucide-react';
 
 export default function Header({
+  activeDbKey = 'employee_db',
+  onSwitchDatabase,
   activeView,
   onNavigate,
   currentUser,
@@ -49,30 +54,18 @@ export default function Header({
     };
   }, [isMobileMenuOpen]);
 
-  // Scroll tracker: detects when user has scrolled down
-  const [isScrolled, setIsScrolled] = useState(false);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 35);
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll();
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  // When scrolling down OR navigating to other sections (not on top of dashboard),
-  // collapse the nav bar so ONLY the circular user profile circle is visible
-  const isNavCollapsed = isScrolled || activeView !== 'dashboard';
-
   const handleMobileNav = (viewKey) => {
     onNavigate(viewKey);
     setIsMobileMenuOpen(false);
   };
 
+  const handleSwitchDb = (key) => {
+    if (onSwitchDatabase) onSwitchDatabase(key);
+  };
+
   return (
     <>
-      <header className={`app-header ${isNavCollapsed ? 'nav-collapsed-floating' : ''}`}>
+      <header className="app-header">
         <div className="header-inner-container">
           {/* Brand Identity */}
           <div className="header-brand-group">
@@ -87,12 +80,8 @@ export default function Header({
               <div className="brand-text-block">
                 <div className="brand-title-line">
                   <span className="brand-name">SQL PLAYGROUND</span>
-                  <span className="brand-badge-pro font-mono">
-                    <span className="brand-badge-dot" />
-                    STUDIO
-                  </span>
+                  <span className="brand-badge-pro font-mono">STUDIO</span>
                 </div>
-                <span className="brand-subtext">Interactive SQL Workspace</span>
               </div>
             </div>
           </div>
@@ -102,67 +91,97 @@ export default function Header({
             <button
               onClick={() => onNavigate('dashboard')}
               className={`nav-tab-item ${activeView === 'dashboard' ? 'active' : ''}`}
-              title="Return to Main Dashboard"
+              title="Dashboard"
             >
               <LayoutDashboard className="w-3.5 h-3.5" />
               <span>Dashboard</span>
             </button>
+
+            <button
+              onClick={() => onNavigate('beginner')}
+              className={`nav-tab-item ${['beginner', 'intermediate', 'pro'].includes(activeView) ? 'active' : ''}`}
+              title="Practice"
+            >
+              <Code2 className="w-3.5 h-3.5" />
+              <span>Practice</span>
+            </button>
+
+            <button
+              onClick={() => onNavigate('interview')}
+              className={`nav-tab-item ${activeView === 'interview' ? 'active' : ''}`}
+              title="50 FAANG Interview Scenarios"
+            >
+              <Briefcase className="w-3.5 h-3.5" />
+              <span>Interview</span>
+            </button>
           </nav>
 
-          {/* Desktop Controls Group: Dialect Switcher & Circular Account Avatar */}
+          {/* Database Toggle Switcher (Always visible, direct click to switch) */}
+          <div className="nav-db-toggle-group" role="group" aria-label="Active Database">
+            <button
+              type="button"
+              className={`nav-db-btn ${activeDbKey === 'employee_db' ? 'active db-employee' : ''}`}
+              onClick={() => handleSwitchDb('employee_db')}
+              title="Switch to Employee Database"
+            >
+              <Database className="w-3.5 h-3.5" />
+              <span>Employee DB</span>
+              {activeDbKey === 'employee_db' && <span className="active-dot" />}
+            </button>
+
+            <button
+              type="button"
+              className={`nav-db-btn ${activeDbKey === 'hospital_db' ? 'active db-hospital' : ''}`}
+              onClick={() => handleSwitchDb('hospital_db')}
+              title="Switch to Hospital Database"
+            >
+              <Activity className="w-3.5 h-3.5" />
+              <span>Hospital DB</span>
+              {activeDbKey === 'hospital_db' && <span className="active-dot" />}
+            </button>
+          </div>
+
+          {/* Desktop Controls Group: Dialect, Tour & Account */}
           <div className="header-controls-group">
-            {/* Dialect Switcher: MySQL vs PostgreSQL with Default Indicator */}
-            <div className="dataset-segmented-control dialect-selector-control animated-header-two-options" role="group" aria-label="SQL Dialect">
+            {/* Clean Segmented Dialect Switcher */}
+            <div className="dialect-selector-control" role="group" aria-label="SQL Dialect">
               <button
                 type="button"
-                onClick={() => {
-                  if (onSwitchDialect) onSwitchDialect('mysql');
-                }}
-                className={`segmented-btn ${sqlDialect === 'mysql' ? 'active is-default' : 'is-inactive'}`}
-                title="Practice in MySQL Dialect (Default)"
+                onClick={() => onSwitchDialect && onSwitchDialect('mysql')}
+                className={`segmented-btn ${sqlDialect === 'mysql' ? 'active is-default' : ''}`}
+                title="MySQL Dialect (Default)"
               >
                 <span>MySQL</span>
-                {sqlDialect === 'mysql' && (
-                  <span className="header-mini-badge">
-                    <span className="mini-pulse-dot" />
-                    DEFAULT
-                  </span>
-                )}
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  if (onSwitchDialect) onSwitchDialect('postgresql');
-                }}
-                className={`segmented-btn ${sqlDialect === 'postgresql' ? 'active' : 'is-inactive'}`}
-                title="Practice in PostgreSQL Dialect"
+                onClick={() => onSwitchDialect && onSwitchDialect('postgresql')}
+                className={`segmented-btn ${sqlDialect === 'postgresql' ? 'active' : ''}`}
+                title="PostgreSQL Dialect"
               >
-                <span>PostgreSQL</span>
-                {sqlDialect === 'postgresql' && (
-                  <span className="header-mini-badge">ACTIVE</span>
-                )}
+                <span>Postgres</span>
               </button>
             </div>
 
-            {/* Quick Tour Button */}
+            {/* Quick Tour Button (Upgraded with Sparkles icon, no more question mark) */}
             {onOpenOnboarding && (
               <button
                 type="button"
                 className="header-tour-btn"
                 onClick={onOpenOnboarding}
-                title="Quick Onboarding Tour"
-                aria-label="Quick Onboarding Tour"
+                title="Start Guided Platform Tour"
+                aria-label="Start Guided Platform Tour"
               >
-                <HelpCircle className="w-3.5 h-3.5 text-cyan-400" />
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
                 <span className="tour-label">Tour</span>
               </button>
             )}
 
-            {/* Subtle Divider */}
+            {/* Divider */}
             <div className="header-v-divider" />
 
-            {/* Circular User Login / Profile Avatar Button */}
-            <div className={`nav-avatar-wrapper ${isNavCollapsed ? 'floating-circle-dock' : ''}`}>
+            {/* Circular User Login / Profile Avatar */}
+            <div className="nav-avatar-wrapper">
               <button
                 type="button"
                 onClick={() => onNavigate('auth')}
@@ -184,7 +203,7 @@ export default function Header({
                       onNavigate('dashboard');
                     }}
                   >
-                    <LayoutDashboard className="w-3 h-3 inline mr-1" /> Return to Dashboard
+                    <LayoutDashboard className="w-3 h-3 inline mr-1" /> Dashboard
                   </button>
                 )}
               </div>
@@ -205,7 +224,7 @@ export default function Header({
             </button>
 
             <button
-              className={`mobile-menu-toggle-btn ${isNavCollapsed ? 'collapsed-hide' : ''}`}
+              className="mobile-menu-toggle-btn"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               aria-label={isMobileMenuOpen ? 'Close Navigation Menu' : 'Open Navigation Menu'}
               aria-expanded={isMobileMenuOpen}
@@ -271,9 +290,36 @@ export default function Header({
             </div>
           </div>
 
+          {/* Database Switcher in Mobile Drawer */}
+          <div className="mobile-section">
+            <span className="mobile-section-label">DATABASE</span>
+            <div className="mobile-dialect-selector">
+              <button
+                onClick={() => {
+                  handleSwitchDb('employee_db');
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`mobile-dialect-btn ${activeDbKey === 'employee_db' ? 'active' : ''}`}
+              >
+                <Database className="w-4 h-4 inline mr-1" />
+                <span>Employee DB</span>
+              </button>
+              <button
+                onClick={() => {
+                  handleSwitchDb('hospital_db');
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`mobile-dialect-btn ${activeDbKey === 'hospital_db' ? 'active' : ''}`}
+              >
+                <Activity className="w-4 h-4 inline mr-1" />
+                <span>Hospital DB</span>
+              </button>
+            </div>
+          </div>
+
           {/* Main Navigation Links */}
           <div className="mobile-section">
-            <span className="mobile-section-label">NAVIGATION</span>
+            <span className="mobile-section-label">NAVIGATE</span>
             <div className="mobile-nav-links">
               <button
                 onClick={() => handleMobileNav('dashboard')}
@@ -282,12 +328,41 @@ export default function Header({
                 <LayoutDashboard className="w-4 h-4" />
                 <span>Dashboard</span>
               </button>
+
+              <button
+                onClick={() => handleMobileNav('beginner')}
+                className={`mobile-nav-item ${['beginner', 'intermediate', 'pro'].includes(activeView) ? 'active' : ''}`}
+              >
+                <Code2 className="w-4 h-4" />
+                <span>Practice</span>
+              </button>
+
+              <button
+                onClick={() => handleMobileNav('interview')}
+                className={`mobile-nav-item ${activeView === 'interview' ? 'active' : ''}`}
+              >
+                <Briefcase className="w-4 h-4" />
+                <span>Interview Prep</span>
+              </button>
+
+              {onOpenOnboarding && (
+                <button
+                  onClick={() => {
+                    onOpenOnboarding();
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="mobile-nav-item tour-item"
+                >
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                  <span>Guided Tour</span>
+                </button>
+              )}
             </div>
           </div>
 
           {/* SQL Dialect Selector Section */}
           <div className="mobile-section">
-            <span className="mobile-section-label">SQL DIALECT</span>
+            <span className="mobile-section-label">DIALECT</span>
             <div className="mobile-dialect-selector">
               <button
                 onClick={() => {
@@ -296,7 +371,7 @@ export default function Header({
                 }}
                 className={`mobile-dialect-btn ${sqlDialect === 'mysql' ? 'active' : ''}`}
               >
-                <span>MySQL (Default)</span>
+                <span>MySQL</span>
               </button>
               <button
                 onClick={() => {

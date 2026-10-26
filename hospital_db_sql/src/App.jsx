@@ -145,10 +145,29 @@ export default function App() {
   const handleSwitchDatabase = (newDbKey) => {
     if (newDbKey === activeDbKey) return;
     setActiveDbKey(newDbKey);
-    setActiveQuestion(null);
+
+    if (activeView === 'interview') {
+      setActiveView('beginner');
+      const questions = ALL_CHALLENGES[newDbKey]?.['Beginner'] || [];
+      if (questions.length > 0) {
+        setActiveQuestion(questions[0]);
+        setUserSql(questions[0].initialQuery || '');
+      }
+    } else if (['beginner', 'intermediate', 'pro'].includes(activeView)) {
+      const levelCapitalized = activeView.charAt(0).toUpperCase() + activeView.slice(1);
+      const questions = ALL_CHALLENGES[newDbKey]?.[levelCapitalized] || [];
+      if (questions.length > 0) {
+        setActiveQuestion(questions[0]);
+        setUserSql(questions[0].initialQuery || '');
+      }
+    } else {
+      setActiveQuestion(null);
+    }
+
     setValidationResult(null);
     setUserQueryExecuted(false);
   };
+
 
   // Navigation Router
   const handleNavigate = (viewRoute) => {
