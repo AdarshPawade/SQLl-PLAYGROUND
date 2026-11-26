@@ -4,7 +4,6 @@ import {
   Terminal, Database, Eye, Copy, Check, ArrowRight, Lock 
 } from 'lucide-react';
 import ValidationResults from './ValidationResults';
-import { trackEvent } from '../utils/tracker';
 
 export default function SqlPlayground({
   currentQuestion,
@@ -46,7 +45,6 @@ export default function SqlPlayground({
   };
 
   const handleResetQuery = () => {
-    trackEvent('click', 'reset_query_button');
     setUserSql(currentQuestion.initialQuery || '');
   };
 
@@ -56,7 +54,6 @@ export default function SqlPlayground({
 
   const handleCopySolution = () => {
     if (activeReferenceSql) {
-      trackEvent('click', 'copy_solution_button');
       navigator.clipboard.writeText(activeReferenceSql);
       setCopiedSolution(true);
       setTimeout(() => setCopiedSolution(false), 2000);
@@ -65,7 +62,6 @@ export default function SqlPlayground({
 
   const handleInsertSolution = () => {
     if (activeReferenceSql) {
-      trackEvent('click', 'insert_solution_button');
       setUserSql(activeReferenceSql);
     }
   };
@@ -163,10 +159,7 @@ export default function SqlPlayground({
               <button
                 type="button"
                 className="btn-hint-link"
-                onClick={() => {
-                  if (!showHint) trackEvent('click', 'show_hint_button');
-                  setShowHint(!showHint);
-                }}
+                onClick={() => setShowHint(!showHint)}
               >
                 <HelpCircle size={14} />
                 {showHint ? 'Hide Hint' : 'Show Hint'}
@@ -178,10 +171,7 @@ export default function SqlPlayground({
                 type="button"
                 className="btn-hint-link"
                 style={{ borderColor: 'rgba(99, 102, 241, 0.4)', color: '#818cf8' }}
-                onClick={() => {
-                  if (!showSolution) trackEvent('click', 'show_solution_button');
-                  setShowSolution(!showSolution);
-                }}
+                onClick={() => setShowSolution(!showSolution)}
               >
                 <Eye size={14} />
                 {showSolution ? 'Hide Solution' : `Show ${sqlDialect === 'mysql' ? 'MySQL' : 'PostgreSQL'} Solution`}

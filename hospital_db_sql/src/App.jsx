@@ -11,7 +11,7 @@ import LiquidCanvas from './components/LiquidCanvas';
 import OnboardingModal from './components/OnboardingModal';
 import AdminDashboard from './pages/AdminDashboard';
 import { Code2, ListOrdered, Database } from 'lucide-react';
-import { trackEvent } from './utils/tracker';
+import { trackVisit } from './utils/tracker';
 
 import {
   getActiveSession,
@@ -53,11 +53,11 @@ function SqlPlaygroundStudio() {
   // Active View State: 'dashboard' (default), 'interview', 'beginner', 'intermediate', 'pro', 'levels', 'auth'
   const [activeView, setActiveView] = useState('dashboard');
 
-  // Track unique session visit once per browser session
+  // Count unique browser session visit once (no action logging)
   useEffect(() => {
     try {
       if (!sessionStorage.getItem('visited')) {
-        trackEvent('visit', 'sql_playground_main');
+        trackVisit();
         sessionStorage.setItem('visited', 'true');
       }
     } catch {
@@ -225,7 +225,6 @@ function SqlPlaygroundStudio() {
   // Handle switching database schema
   const handleSwitchDatabase = (newDbKey) => {
     if (newDbKey === activeDbKey) return;
-    trackEvent('click', `switch_db_${newDbKey}`);
     setActiveDbKey(newDbKey);
 
     if (activeView === 'interview') {
@@ -253,7 +252,6 @@ function SqlPlaygroundStudio() {
 
   // Navigation Router
   const handleNavigate = (viewRoute) => {
-    trackEvent('click', `nav_${viewRoute}`);
     setActiveView(viewRoute);
     if (viewRoute === 'interview') {
       setActiveDbKey('interview_db');
@@ -313,9 +311,6 @@ function SqlPlaygroundStudio() {
   };
 
   const handleSelectQuestion = (question) => {
-    if (question?.id) {
-      trackEvent('click', `select_question_${question.id}`);
-    }
     setActiveQuestion(question);
     setUserSql(question.initialQuery || '');
     setMobilePracticeTab('editor');
@@ -326,7 +321,6 @@ function SqlPlaygroundStudio() {
   // Run Query & Validate Engine
   const handleRunQuery = () => {
     if (!dbInstance || !activeQuestion) return;
-    trackEvent('click', 'run_query_button');
 
     const result = validateUserQuery(
       dbInstance,
@@ -340,7 +334,6 @@ function SqlPlaygroundStudio() {
     setUserQueryExecuted(true);
 
     if (result.isMatch) {
-      trackEvent('solve', `solve_${activeQuestion.id}`);
       // Mark question as solved
       const newSolved = new Set(solvedQuestionIds).add(activeQuestion.id);
       setSolvedQuestionIds(newSolved);
@@ -465,7 +458,6 @@ function SqlPlaygroundStudio() {
 
   const handleNextQuestion = () => {
     if (!nextQuestion) return;
-    trackEvent('click', 'next_question_button');
     handleSelectQuestion(nextQuestion);
   };
 

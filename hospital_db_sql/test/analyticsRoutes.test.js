@@ -63,64 +63,38 @@ async function run() {
     });
     assert.strictEqual(wrongKeyRes.status, 403);
 
-    // 3. Invalid eventType or unsafe target should return 400
+    // 3. Non-visit action logging should be rejected (400)
     const badEventRes = await request(server, 'POST', '/api/analytics/track', {
-      eventType: 'hover',
-      target: 'btn'
+      eventType: 'click',
+      target: 'run_query_button'
     });
     assert.strictEqual(badEventRes.status, 400);
 
-    const unsafeTargetRes = await request(server, 'POST', '/api/analytics/track', {
-      eventType: 'click',
-      target: 'bad target with spaces!'
+    // 4. Visit counting works cleanly
+    const visit1 = await request(server, 'POST', '/api/analytics/track', {
+      eventType: 'visit'
     });
-    assert.strictEqual(unsafeTargetRes.status, 400);
+    assert.strictEqual(visit1.status, 201);
+    assert.strictEqual(visit1.body.success, true);
 
-    // 4. Track valid visit, clicks, auth, and solve events
-    const visitRes = await request(server, 'POST', '/api/analytics/track', {
-      eventType: 'visit',
-      target: 'sql_playground_main'
+    const visit2 = await request(server, 'POST', '/api/analytics/track', {
+      eventType: 'visit'
     });
-    assert.strictEqual(visitRes.status, 201);
-    assert.strictEqual(visitRes.body.success, true);
+    assert.strictEqual(visit2.status, 201);
 
-    const click1 = await request(server, 'POST', '/api/analytics/track', {
-      eventType: 'click',
-      target: 'run_query_button'
-    });
-    assert.strictEqual(click1.status, 201);
-
-    const click2 = await request(server, 'POST', '/api/analytics/track', {
-      eventType: 'click',
-      target: 'run_query_button'
-    });
-    assert.strictEqual(click2.status, 201);
-
-    const click3 = await request(server, 'POST', '/api/analytics/track', {
-      eventType: 'click',
-      target: 'show_hint_button'
-    });
-    assert.strictEqual(click3.status, 201);
-
-    const solveRes = await request(server, 'POST', '/api/analytics/track', {
-      eventType: 'solve',
-      target: 'solve_emp_beg_1',
-      actor: 'alice_dev'
-    });
-    assert.strictEqual(solveRes.status, 201);
-
-    // 5. Authorized /stats returns aggregated metrics with no-store cache header
+    // 5. Authorized /stats returns aggregate visit & user counts only
     const statsRes = await request(server, 'GET', '/api/analytics/stats', null, {
       'x-admin-key': process.env.ADMIN_SECRET
     });
     assert.strictEqual(statsRes.status, 200);
     assert.ok(String(statsRes.headers['cache-control'] || '').includes('no-store'));
-    assert.strictEqual(statsRes.body.totalVisits, 1);
-    assert.strictEqual(statsRes.body.totalClicks, 3);
-    assert.strictEqual(statsRes.body.totalSolves, 1);
-    assert.strictEqual(statsRes.body.clicksByTarget[0]._id, 'run_query_button');
-    assert.strictEqual(statsRes.body.clicksByTarget[0].count, 2);
-    assert.strictEqual(statsRes.body.recentActivity.length, 5);
+    assert.strictEqual(statsRes.body.totalVisits, 2);
+    assert.strictEqual(statsRes.body.visitsToday, 2);
+    assert.strictEqual(typeof statsRes.body.totalUsers, 'number');
+    assert.strictEqual(Array.isArray(statsRes.body.dailyStats), true);
+    assert.strictEqual(statsRes.body.dailyStats.length, 7);
+    assert.strictEqual(statsRes.body.recentActivity, undefined);
+    assert.strictEqual(statsRes.body.recentUsers, undefined);
 
     console.log('✓ All analytics route tests passed.');
   } finally {

@@ -3,10 +3,10 @@ import {
   ShieldCheck,
   Lock,
   Users,
-  MousePointerClick,
+  Eye,
+  TrendingUp,
   RefreshCw,
   LogOut,
-  Activity,
   ArrowLeft
 } from 'lucide-react';
 import { getAnalyticsApiBase } from '../utils/tracker';
@@ -58,7 +58,6 @@ export default function AdminDashboard() {
     setError('');
   };
 
-  // 1. Login Screen (Shown until valid key is entered)
   if (!stats) {
     return (
       <div style={{
@@ -95,7 +94,7 @@ export default function AdminDashboard() {
             <div>
               <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>Admin Analytics Access</h2>
               <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '2px 0 0' }}>
-                SQL Playground Private Telemetry
+                Visitor &amp; Registration Counts
               </p>
             </div>
           </div>
@@ -157,10 +156,11 @@ export default function AdminDashboard() {
     );
   }
 
-  // 2. Dashboard View (Shown only after verification)
+  const dailyStats = Array.isArray(stats.dailyStats) ? stats.dailyStats : [];
+
   return (
     <div style={{
-      maxWidth: '960px',
+      maxWidth: '920px',
       margin: '0 auto',
       padding: '36px 20px 60px',
       color: 'var(--text-main, #0f172a)'
@@ -178,10 +178,10 @@ export default function AdminDashboard() {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#059669', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>
             <ShieldCheck size={16} />
-            <span>ADMIN TELEMETRY</span>
+            <span>VISITOR &amp; REGISTRATION ANALYTICS ({stats.storageMode === 'mongodb' ? 'MONGODB' : 'MEMORY'})</span>
           </div>
           <h1 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0 }}>
-            SQL Playground — Admin Analytics
+            SQL Playground — Analytics
           </h1>
         </div>
 
@@ -251,156 +251,91 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '28px' }}>
+      {/* Core Counters */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '18px', marginBottom: '28px' }}>
         <div style={{
-          padding: '20px',
+          padding: '22px',
           border: '1px solid rgba(15, 23, 42, 0.1)',
           borderRadius: '12px',
-          background: '#ffffff',
-          boxShadow: '0 4px 16px rgba(15, 23, 42, 0.04)'
+          background: '#ffffff'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#475569', fontSize: '0.9rem', fontWeight: 600 }}>
+            <Eye size={16} color="#0284c7" />
+            <span>Total Visitors</span>
+          </div>
+          <p style={{ fontSize: '2.25rem', fontWeight: 800, margin: '10px 0 6px', color: '#0284c7' }}>
+            {stats.totalVisits ?? 0}
+          </p>
+          <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>
+            Today: {stats.visitsToday ?? 0} • 7d: {stats.visitsLast7Days ?? 0}
+          </p>
+        </div>
+
+        <div style={{
+          padding: '22px',
+          border: '1px solid rgba(15, 23, 42, 0.1)',
+          borderRadius: '12px',
+          background: '#ffffff'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#475569', fontSize: '0.9rem', fontWeight: 600 }}>
             <Users size={16} color="#10b981" />
-            <span>Total Unique Visits</span>
+            <span>Registered Users</span>
           </div>
-          <p style={{ fontSize: '2.1rem', fontWeight: 800, margin: '10px 0 0', color: '#0f172a' }}>
-            {stats.totalVisits}
-          </p>
-        </div>
-
-        <div style={{
-          padding: '20px',
-          border: '1px solid rgba(15, 23, 42, 0.1)',
-          borderRadius: '12px',
-          background: '#ffffff',
-          boxShadow: '0 4px 16px rgba(15, 23, 42, 0.04)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#475569', fontSize: '0.9rem', fontWeight: 600 }}>
-            <MousePointerClick size={16} color="#0284c7" />
-            <span>Total Button Clicks</span>
-          </div>
-          <p style={{ fontSize: '2.1rem', fontWeight: 800, margin: '10px 0 0', color: '#0f172a' }}>
-            {stats.totalClicks}
-          </p>
-        </div>
-
-        <div style={{
-          padding: '20px',
-          border: '1px solid rgba(15, 23, 42, 0.1)',
-          borderRadius: '12px',
-          background: '#ffffff',
-          boxShadow: '0 4px 16px rgba(15, 23, 42, 0.04)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#475569', fontSize: '0.9rem', fontWeight: 600 }}>
-            <ShieldCheck size={16} color="#7c3aed" />
-            <span>Challenges Solved</span>
-          </div>
-          <p style={{ fontSize: '2.1rem', fontWeight: 800, margin: '10px 0 0', color: '#0f172a' }}>
-            {stats.totalSolves ?? 0}
-          </p>
-        </div>
-
-        <div style={{
-          padding: '20px',
-          border: '1px solid rgba(15, 23, 42, 0.1)',
-          borderRadius: '12px',
-          background: '#ffffff',
-          boxShadow: '0 4px 16px rgba(15, 23, 42, 0.04)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#475569', fontSize: '0.9rem', fontWeight: 600 }}>
-            <Users size={16} color="#f59e0b" />
-            <span>Registered Users ({stats.storageMode === 'mongodb' ? 'DB' : 'Mem'})</span>
-          </div>
-          <p style={{ fontSize: '2.1rem', fontWeight: 800, margin: '10px 0 0', color: '#0f172a' }}>
+          <p style={{ fontSize: '2.25rem', fontWeight: 800, margin: '10px 0 6px', color: '#059669' }}>
             {stats.totalUsers ?? 0}
+          </p>
+          <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>
+            Today: {stats.usersToday ?? 0} • 7d: {stats.usersLast7Days ?? 0}
+          </p>
+        </div>
+
+        <div style={{
+          padding: '22px',
+          border: '1px solid rgba(15, 23, 42, 0.1)',
+          borderRadius: '12px',
+          background: '#ffffff'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#475569', fontSize: '0.9rem', fontWeight: 600 }}>
+            <TrendingUp size={16} color="#d97706" />
+            <span>Signup Conversion Rate</span>
+          </div>
+          <p style={{ fontSize: '2.25rem', fontWeight: 800, margin: '10px 0 6px', color: '#d97706' }}>
+            {stats.conversionRate ?? 0}%
+          </p>
+          <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>
+            Registered users per visitor
           </p>
         </div>
       </div>
 
-      {/* Click Breakdown */}
+      {/* Last 7 Days Daily Breakdown */}
       <div style={{
-        marginBottom: '32px',
         padding: '22px',
         borderRadius: '12px',
         border: '1px solid rgba(15, 23, 42, 0.1)',
         background: '#ffffff'
       }}>
         <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '14px' }}>
-          Clicks by Button / Action
+          Last 7 Days Breakdown
         </h3>
-        {stats.clicksByTarget && stats.clicksByTarget.length > 0 ? (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid rgba(15, 23, 42, 0.12)', textAlign: 'left' }}>
-                <th style={{ padding: '10px 12px', fontSize: '0.85rem', color: '#475569' }}>Button / Target</th>
-                <th style={{ padding: '10px 12px', fontSize: '0.85rem', color: '#475569', textAlign: 'right' }}>Click Count</th>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid rgba(15, 23, 42, 0.12)', textAlign: 'left' }}>
+              <th style={{ padding: '10px 12px', fontSize: '0.85rem', color: '#475569' }}>Date (UTC)</th>
+              <th style={{ padding: '10px 12px', fontSize: '0.85rem', color: '#475569', textAlign: 'right' }}>Visitors</th>
+              <th style={{ padding: '10px 12px', fontSize: '0.85rem', color: '#475569', textAlign: 'right' }}>New Registered Users</th>
+            </tr>
+          </thead>
+          <tbody>
+            {dailyStats.slice().reverse().map((row) => (
+              <tr key={row.date} style={{ borderBottom: '1px solid rgba(15, 23, 42, 0.06)' }}>
+                <td style={{ padding: '10px 12px', fontFamily: 'var(--font-mono, monospace)' }}>{row.date}</td>
+                <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700 }}>{row.visits}</td>
+                <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700 }}>{row.newUsers}</td>
               </tr>
-            </thead>
-            <tbody>
-              {stats.clicksByTarget.map((item) => (
-                <tr key={item._id} style={{ borderBottom: '1px solid rgba(15, 23, 42, 0.06)' }}>
-                  <td style={{ padding: '10px 12px', fontFamily: 'var(--font-mono, monospace)', fontSize: '0.9rem' }}>
-                    {item._id}
-                  </td>
-                  <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700 }}>
-                    {item.count}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <p style={{ color: '#64748b', fontSize: '0.9rem' }}>No button clicks recorded yet.</p>
-        )}
-      </div>
-
-      {/* Recent Activity Log */}
-      <div style={{
-        padding: '22px',
-        borderRadius: '12px',
-        border: '1px solid rgba(15, 23, 42, 0.1)',
-        background: '#ffffff'
-      }}>
-        <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.1rem', fontWeight: 700, marginBottom: '14px' }}>
-          <Activity size={18} color="#10b981" />
-          <span>Recent Activity</span>
-        </h3>
-        {stats.recentActivity && stats.recentActivity.length > 0 ? (
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: '10px' }}>
-            {stats.recentActivity.map((log, idx) => (
-              <li
-                key={log._id || idx}
-                style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  justifyContent: 'space-between',
-                  gap: '8px',
-                  padding: '10px 12px',
-                  borderRadius: '8px',
-                  background: '#f8fafc',
-                  border: '1px solid rgba(15, 23, 42, 0.06)',
-                  fontSize: '0.9rem'
-                }}
-              >
-                <span>
-                  <strong style={{
-                    color: log.eventType === 'visit' ? '#059669' : '#0284c7',
-                    marginRight: '8px'
-                  }}>
-                    [{String(log.eventType || '').toUpperCase()}]
-                  </strong>
-                  <span style={{ fontFamily: 'var(--font-mono, monospace)' }}>{log.target}</span>
-                </span>
-                <span style={{ color: '#64748b', fontSize: '0.825rem' }}>
-                  {new Date(log.timestamp).toLocaleString()}
-                </span>
-              </li>
             ))}
-          </ul>
-        ) : (
-          <p style={{ color: '#64748b', fontSize: '0.9rem' }}>No recent activity logged yet.</p>
-        )}
+          </tbody>
+        </table>
       </div>
     </div>
   );

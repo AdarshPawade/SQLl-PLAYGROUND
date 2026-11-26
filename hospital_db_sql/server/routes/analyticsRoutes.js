@@ -3,23 +3,29 @@ import crypto from 'crypto';
 import mongoose from 'mongoose';
 import Analytics from '../models/Analytics.js';
 import { User } from '../models/User.js';
-import { UserProgress } from '../models/UserProgress.js';
 import { logger } from '../utils/logger.js';
 
 const router = express.Router();
 
-// In-memory fallback store when MongoDB is unavailable (e.g., offline dev or test runs)
-const inMemoryEvents = [];
-const MAX_IN_MEMORY_EVENTS = 5000;
-const ALLOWED_EVENT_TYPES = new Set(['visit', 'click', 'auth', 'solve']);
-const TARGET_ALLOW_PATTERN = /^[a-zA-Z0-9_.:/-]{1,120}$/;
-const ACTOR_ALLOW_PATTERN = /^[a-zA-Z0-9_.-]{1,64}$/;
+// In-memory fallback store when MongoDB is offline (e.g., local dev without DB or unit tests)
+const inMemoryVisits = [];
+const MAX_IN_MEMORY_VISITS = 5000;
 
 function isMongoConnected() {
   return mongoose.connection && mongoose.connection.readyState === 1;
 }
 
-// Middleware to verify only the admin can access analytics stats
+function getLastNDaysKeys(days = 7) {
+  const keys = [];
+  const now = new Date();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i));
+    keys.push(d.toISOString().slice(0, 10));
+  }
+  return keys;
+}
+
+// Middleware to verify admin secret key
 const verifyAdmin = (req, res, next) => {
   const expectedSecret = process.env.ADMIN_SECRET;
   const adminKey = req.headers['x-admin-key'];
@@ -43,158 +49,127 @@ const verifyAdmin = (req, res, next) => {
   next();
 };
 
-// PUBLIC: Log a visit, click, auth, or challenge solve event
+// PUBLIC: Increment site visit counter (no user actions or PII logged)
 router.post('/track', async (req, res) => {
   try {
-    const { eventType, target, actor } = req.body || {};
-
-    if (!ALLOWED_EVENT_TYPES.has(eventType)) {
-      return res.status(400).json({ error: 'Invalid eventType. Must be "visit", "click", "auth", or "solve".' });
+    const { eventType = 'visit' } = req.body || {};
+    if (eventType !== 'visit') {
+      return res.status(400).json({ error: 'Only "visit" counting is enabled.' });
     }
-
-    if (typeof target !== 'string' || !TARGET_ALLOW_PATTERN.test(target.trim())) {
-      return res.status(400).json({ error: 'Invalid target. Must be 1-120 safe identifier characters.' });
-    }
-
-    const sanitizedTarget = target.trim();
-    const sanitizedActor =
-      typeof actor === 'string' && ACTOR_ALLOW_PATTERN.test(actor.trim())
-        ? actor.trim()
-        : 'guest';
 
     if (isMongoConnected()) {
-      await Analytics.create({ eventType, target: sanitizedTarget, actor: sanitizedActor });
+      await Analytics.create({ eventType: 'visit' });
     } else {
-      inMemoryEvents.unshift({
-        _id: `${Date.now()}_${crypto.randomBytes(4).toString('hex')}`,
-        eventType,
-        target: sanitizedTarget,
-        actor: sanitizedActor,
-        timestamp: new Date()
-      });
-      if (inMemoryEvents.length > MAX_IN_MEMORY_EVENTS) {
-        inMemoryEvents.length = MAX_IN_MEMORY_EVENTS;
+      inMemoryVisits.push({ timestamp: new Date() });
+      if (inMemoryVisits.length > MAX_IN_MEMORY_VISITS) {
+        inMemoryVisits.shift();
       }
     }
 
     res.status(201).json({ success: true });
   } catch {
-    res.status(500).json({ error: 'Failed to log event' });
+    res.status(500).json({ error: 'Failed to count visit' });
   }
 });
 
-// ADMIN ONLY: Fetch aggregated visits, clicks, user summary, and recent activity
+// ADMIN ONLY: Return aggregate visitor & registered user counts (no activity logs)
 router.get('/stats', verifyAdmin, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   try {
+    const dayKeys = getLastNDaysKeys(7);
+    const todayKey = dayKeys[dayKeys.length - 1];
+    const startOfToday = new Date(`${todayKey}T00:00:00.000Z`);
+    const startOf7Days = new Date(`${dayKeys[0]}T00:00:00.000Z`);
+
     if (isMongoConnected()) {
       const [
         totalVisits,
-        totalClicks,
-        totalSolves,
-        totalAuthEvents,
+        visitsToday,
         totalUsers,
-        clicksByTarget,
-        recentActivity,
-        recentUsersRaw
+        usersToday,
+        dailyVisitsAgg,
+        dailyUsersAgg
       ] = await Promise.all([
         Analytics.countDocuments({ eventType: 'visit' }),
-        Analytics.countDocuments({ eventType: 'click' }),
-        Analytics.countDocuments({ eventType: 'solve' }),
-        Analytics.countDocuments({ eventType: 'auth' }),
+        Analytics.countDocuments({ eventType: 'visit', timestamp: { $gte: startOfToday } }),
         User.countDocuments(),
+        User.countDocuments({ createdAt: { $gte: startOfToday } }),
         Analytics.aggregate([
-          { $match: { eventType: { $in: ['click', 'auth', 'solve'] } } },
-          { $group: { _id: '$target', count: { $sum: 1 } } },
-          { $sort: { count: -1 } },
-          { $limit: 25 }
+          { $match: { eventType: 'visit', timestamp: { $gte: startOf7Days } } },
+          {
+            $group: {
+              _id: { $dateToString: { format: '%Y-%m-%d', date: '$timestamp' } },
+              count: { $sum: 1 }
+            }
+          }
         ]),
-        Analytics.find()
-          .sort({ timestamp: -1 })
-          .limit(25)
-          .lean(),
-        User.find()
-          .select('username email role profile.fullName createdAt lastLogin')
-          .sort({ lastLogin: -1, createdAt: -1 })
-          .limit(20)
-          .lean()
+        User.aggregate([
+          { $match: { createdAt: { $gte: startOf7Days } } },
+          {
+            $group: {
+              _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+              count: { $sum: 1 }
+            }
+          }
+        ])
       ]);
 
-      const userIds = recentUsersRaw.map(u => String(u._id));
-      const progressDocs = userIds.length > 0
-        ? await UserProgress.find()
-            .where('userId')
-            .in(userIds)
-            .select('userId solvedQuestions updatedAt')
-            .lean()
-        : [];
-      const solvedByUserId = new Map(
-        progressDocs.map(p => [String(p.userId), Array.isArray(p.solvedQuestions) ? p.solvedQuestions.length : 0])
-      );
+      const visitByDay = new Map(dailyVisitsAgg.map(d => [d._id, d.count]));
+      const usersByDay = new Map(dailyUsersAgg.map(d => [d._id, d.count]));
 
-      const recentUsers = recentUsersRaw.map(u => ({
-        id: String(u._id),
-        username: u.username,
-        email: u.email,
-        role: u.role,
-        fullName: u.profile?.fullName || u.username,
-        solvedCount: solvedByUserId.get(String(u._id)) || 0,
-        createdAt: u.createdAt,
-        lastLogin: u.lastLogin
+      const dailyStats = dayKeys.map(date => ({
+        date,
+        visits: visitByDay.get(date) || 0,
+        newUsers: usersByDay.get(date) || 0
       }));
+
+      const visitsLast7Days = dailyStats.reduce((sum, d) => sum + d.visits, 0);
+      const usersLast7Days = dailyStats.reduce((sum, d) => sum + d.newUsers, 0);
+      const conversionRate = totalVisits > 0
+        ? Number(((totalUsers / totalVisits) * 100).toFixed(1))
+        : 0;
 
       return res.json({
         storageMode: 'mongodb',
         totalVisits,
-        totalClicks,
-        totalSolves,
-        totalAuthEvents,
+        visitsToday,
+        visitsLast7Days,
         totalUsers,
-        clicksByTarget,
-        recentActivity,
-        recentUsers
+        usersToday,
+        usersLast7Days,
+        conversionRate,
+        dailyStats
       });
     }
 
-    // In-memory aggregation fallback
-    let totalVisits = 0;
-    let totalClicks = 0;
-    let totalSolves = 0;
-    let totalAuthEvents = 0;
-    const clickCounts = new Map();
-
-    for (const evt of inMemoryEvents) {
-      if (evt.eventType === 'visit') {
-        totalVisits += 1;
-      } else if (evt.eventType === 'click') {
-        totalClicks += 1;
-        clickCounts.set(evt.target, (clickCounts.get(evt.target) || 0) + 1);
-      } else if (evt.eventType === 'solve') {
-        totalSolves += 1;
-        clickCounts.set(evt.target, (clickCounts.get(evt.target) || 0) + 1);
-      } else if (evt.eventType === 'auth') {
-        totalAuthEvents += 1;
-        clickCounts.set(evt.target, (clickCounts.get(evt.target) || 0) + 1);
-      }
+    // In-memory fallback
+    const visitByDay = new Map();
+    let visitsToday = 0;
+    for (const v of inMemoryVisits) {
+      const key = new Date(v.timestamp).toISOString().slice(0, 10);
+      visitByDay.set(key, (visitByDay.get(key) || 0) + 1);
+      if (key === todayKey) visitsToday += 1;
     }
 
-    const clicksByTarget = Array.from(clickCounts.entries())
-      .map(([_id, count]) => ({ _id, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 25);
+    const dailyStats = dayKeys.map(date => ({
+      date,
+      visits: visitByDay.get(date) || 0,
+      newUsers: 0
+    }));
 
-    const recentActivity = inMemoryEvents.slice(0, 25);
+    const totalVisits = inMemoryVisits.length;
+    const visitsLast7Days = dailyStats.reduce((sum, d) => sum + d.visits, 0);
 
     res.json({
       storageMode: 'memory',
       totalVisits,
-      totalClicks,
-      totalSolves,
-      totalAuthEvents,
+      visitsToday,
+      visitsLast7Days,
       totalUsers: 0,
-      clicksByTarget,
-      recentActivity,
-      recentUsers: []
+      usersToday: 0,
+      usersLast7Days: 0,
+      conversionRate: 0,
+      dailyStats
     });
   } catch {
     res.status(500).json({ error: 'Failed to fetch analytics' });

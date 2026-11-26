@@ -17,7 +17,6 @@ import {
   syncProgressApi,
   logoutApi
 } from '../services/api.js';
-import { trackEvent } from '../utils/tracker.js';
 import './AuthSystem.css';
 
 
@@ -206,7 +205,6 @@ export default function AuthSystem({ currentUser: propUser, onSessionChange, onN
         // Keep password hashes strictly in MongoDB; only store non-sensitive active session locally
         const sessionUser = syncCloudUserToLocalSession(cloudRes.user);
         setCurrentUser(sessionUser);
-        trackEvent('auth', 'user_signup', sessionUser.username);
 
         // Sync any prior guest progress into the newly created account
         try {
@@ -286,7 +284,6 @@ export default function AuthSystem({ currentUser: propUser, onSessionChange, onN
 
       if (cloudRes.success && cloudRes.user) {
         const sessionUser = syncCloudUserToLocalSession(cloudRes.user);
-        trackEvent('auth', 'user_login', sessionUser.username);
 
         // Fetch and merge this user's cloud progress
         try {
