@@ -1,5 +1,8 @@
 import mongoose from 'mongoose';
 
+// Prevent NoSQL query-selector injection ($ne, $gt, etc.) across all Mongoose queries
+mongoose.set('sanitizeFilter', true);
+
 export async function connectDB() {
   const mongoUri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/sql_playground';
   

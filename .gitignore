@@ -1,0 +1,21 @@
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies & Build Artifacts
+node_modules/
+dist/
+build/
+
+# Logs & Encrypted Backups
+logs/
+*.log
+**/server/logs/
+**/server/backups/*.enc
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

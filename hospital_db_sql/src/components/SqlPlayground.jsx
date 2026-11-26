@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { 
   Play, HelpCircle, RotateCcw, CheckCircle, Code2, 
-  Terminal, Database, Eye, Copy, Check 
+  Terminal, Database, Eye, Copy, Check, ArrowRight, Lock 
 } from 'lucide-react';
 import ValidationResults from './ValidationResults';
+import { trackEvent } from '../utils/tracker';
 
 export default function SqlPlayground({
   currentQuestion,
@@ -14,7 +15,9 @@ export default function SqlPlayground({
   userQueryExecuted,
   isSolved,
   sqlDialect = 'mysql',
-  onSwitchDialect
+  onSwitchDialect,
+  onNextQuestion,
+  hasNextQuestion = false
 }) {
   const [showHint, setShowHint] = useState(false);
   const [showSolution, setShowSolution] = useState(false);
@@ -43,6 +46,7 @@ export default function SqlPlayground({
   };
 
   const handleResetQuery = () => {
+    trackEvent('click', 'reset_query_button');
     setUserSql(currentQuestion.initialQuery || '');
   };
 
@@ -52,6 +56,7 @@ export default function SqlPlayground({
 
   const handleCopySolution = () => {
     if (activeReferenceSql) {
+      trackEvent('click', 'copy_solution_button');
       navigator.clipboard.writeText(activeReferenceSql);
       setCopiedSolution(true);
       setTimeout(() => setCopiedSolution(false), 2000);
@@ -60,9 +65,13 @@ export default function SqlPlayground({
 
   const handleInsertSolution = () => {
     if (activeReferenceSql) {
+      trackEvent('click', 'insert_solution_button');
       setUserSql(activeReferenceSql);
     }
   };
+
+  const isQuestionSolved = Boolean(isSolved || (userQueryExecuted && validationResult?.isMatch));
+  const canGoNext = Boolean(isQuestionSolved && hasNextQuestion && onNextQuestion);
 
   return (
     <main className="playground-container">
@@ -154,7 +163,10 @@ export default function SqlPlayground({
               <button
                 type="button"
                 className="btn-hint-link"
-                onClick={() => setShowHint(!showHint)}
+                onClick={() => {
+                  if (!showHint) trackEvent('click', 'show_hint_button');
+                  setShowHint(!showHint);
+                }}
               >
                 <HelpCircle size={14} />
                 {showHint ? 'Hide Hint' : 'Show Hint'}
@@ -166,7 +178,10 @@ export default function SqlPlayground({
                 type="button"
                 className="btn-hint-link"
                 style={{ borderColor: 'rgba(99, 102, 241, 0.4)', color: '#818cf8' }}
-                onClick={() => setShowSolution(!showSolution)}
+                onClick={() => {
+                  if (!showSolution) trackEvent('click', 'show_solution_button');
+                  setShowSolution(!showSolution);
+                }}
               >
                 <Eye size={14} />
                 {showSolution ? 'Hide Solution' : `Show ${sqlDialect === 'mysql' ? 'MySQL' : 'PostgreSQL'} Solution`}
@@ -295,6 +310,47 @@ export default function SqlPlayground({
           validationResult={validationResult}
           userQueryExecuted={userQueryExecuted}
         />
+
+        {/* Next Question Navigation Bar (inactive until current question is solved correctly) */}
+        <div className="playground-next-bar">
+          <span className="playground-next-hint">
+            {!isQuestionSolved
+              ? 'Solve this query correctly to activate Next Question.'
+              : hasNextQuestion
+                ? 'Correct solution verified! Ready for the next challenge.'
+                : 'You have reached the last question in this section.'}
+          </span>
+          <button
+            type="button"
+            className={`btn-next-question ${canGoNext ? 'active' : 'inactive'}`}
+            onClick={onNextQuestion}
+            disabled={!canGoNext}
+            title={
+              !isQuestionSolved
+                ? 'Solve the current question correctly first'
+                : hasNextQuestion
+                  ? 'Go to the next question'
+                  : 'No more questions in this section'
+            }
+          >
+            {!isQuestionSolved ? (
+              <>
+                <Lock size={15} />
+                <span>Next Question</span>
+              </>
+            ) : hasNextQuestion ? (
+              <>
+                <span>Next Question</span>
+                <ArrowRight size={16} />
+              </>
+            ) : (
+              <>
+                <CheckCircle size={15} />
+                <span>Section Complete</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </main>
   );

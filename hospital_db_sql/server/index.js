@@ -1,3 +1,4 @@
+import './config/loadEnv.js';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -19,6 +20,7 @@ import mcqRoute from './routes/mcq.js';
 import executeRoute from './routes/execute.js';
 import progressRoute from './routes/progress.js';
 import playgroundRoute from './routes/playground.js';
+import analyticsRoutes from './routes/analyticsRoutes.js';
 
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -83,7 +85,7 @@ app.use(cors({
     }
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Guest-ID'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Guest-ID', 'X-Admin-Key'],
   credentials: true
 }));
 
@@ -117,8 +119,31 @@ const executeStrictLimiter = rateLimit({
   message: { success: false, error: 'Execution Throttle: Query execution rate limit exceeded.' }
 });
 
+const adminStatsLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // Max 10 failed admin auth attempts per 15 min per IP
+  skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many failed admin authentication attempts. Please try again later.' },
+  handler: (req, res, _next, options) => {
+    logger.securityAlert(`Admin Auth Brute-Force Throttled for IP: ${req.ip}`);
+    res.status(429).json(options.message);
+  }
+});
+
+const analyticsTrackLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 60, // Max 60 telemetry events per minute per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Analytics rate limit exceeded.' }
+});
+
 app.use('/api', generalApiLimiter);
 app.use('/api/execute', executeStrictLimiter);
+app.use('/api/analytics/stats', adminStatsLimiter);
+app.use('/api/analytics/track', analyticsTrackLimiter);
 
 // Register Core Public API Routes
 app.use('/api/health', healthRoute);
@@ -130,6 +155,7 @@ app.use('/api/mcq', mcqRoute);
 app.use('/api/execute', executeRoute);
 app.use('/api/progress', progressRoute);
 app.use('/api/playground', playgroundRoute);
+app.use('/api/analytics', analyticsRoutes);
 
 // Backward Compatibility test endpoint
 app.post('/api/auth/validate-password', (req, res) => {

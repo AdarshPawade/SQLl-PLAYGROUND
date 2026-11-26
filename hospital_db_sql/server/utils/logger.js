@@ -13,7 +13,9 @@ const SENSITIVE_PATTERNS = [
   /credit_card/i,
   /card_number/i,
   /api_key/i,
-  /private_key/i
+  /private_key/i,
+  /x-admin-key/i,
+  /admin_secret/i
 ];
 
 /**

@@ -9,7 +9,9 @@ import AuthSystem from './components/AuthSystem';
 import Footer from './components/Footer';
 import LiquidCanvas from './components/LiquidCanvas';
 import OnboardingModal from './components/OnboardingModal';
+import AdminDashboard from './pages/AdminDashboard';
 import { Code2, ListOrdered, Database } from 'lucide-react';
+import { trackEvent } from './utils/tracker';
 
 import { getActiveSession, getUserProgress, saveUserProgress } from './utils/cryptoAuth.js';
 
@@ -23,8 +25,32 @@ import { INTERVIEW_QUESTIONS } from './data/interviewQuestions';
 import { createHospitalDatabase, validateUserQuery } from './utils/sqlEngine';
 
 export default function App() {
+  const isAdminRoute =
+    typeof window !== 'undefined' &&
+    window.location.pathname.replace(/\/+$/, '') === '/admin';
+
+  if (isAdminRoute) {
+    return <AdminDashboard />;
+  }
+
+  return <SqlPlaygroundStudio />;
+}
+
+function SqlPlaygroundStudio() {
   // Active View State: 'dashboard' (default), 'interview', 'beginner', 'intermediate', 'pro', 'levels', 'auth'
   const [activeView, setActiveView] = useState('dashboard');
+
+  // Track unique session visit once per browser session
+  useEffect(() => {
+    try {
+      if (!sessionStorage.getItem('visited')) {
+        trackEvent('visit', 'sql_playground_main');
+        sessionStorage.setItem('visited', 'true');
+      }
+    } catch {
+      // Ignore storage access errors
+    }
+  }, []);
 
   // SQL Dialect: 'mysql' | 'postgresql'
   const [sqlDialect, setSqlDialect] = useState('mysql');
@@ -144,6 +170,7 @@ export default function App() {
   // Handle switching database schema
   const handleSwitchDatabase = (newDbKey) => {
     if (newDbKey === activeDbKey) return;
+    trackEvent('click', `switch_db_${newDbKey}`);
     setActiveDbKey(newDbKey);
 
     if (activeView === 'interview') {
@@ -171,6 +198,7 @@ export default function App() {
 
   // Navigation Router
   const handleNavigate = (viewRoute) => {
+    trackEvent('click', `nav_${viewRoute}`);
     setActiveView(viewRoute);
     if (viewRoute === 'interview') {
       setActiveDbKey('interview_db');
@@ -240,6 +268,7 @@ export default function App() {
   // Run Query & Validate Engine
   const handleRunQuery = () => {
     if (!dbInstance || !activeQuestion) return;
+    trackEvent('click', 'run_query_button');
 
     const result = validateUserQuery(
       dbInstance,
@@ -354,6 +383,18 @@ export default function App() {
 
   const sidebarQuestions = isInterviewMode ? INTERVIEW_QUESTIONS : currentLevelQuestions;
   const totalSolvedCount = solvedQuestionIds.size;
+  const currentQuestionIdx = activeQuestion
+    ? sidebarQuestions.findIndex(q => q.id === activeQuestion.id)
+    : -1;
+  const nextQuestion = currentQuestionIdx >= 0 && currentQuestionIdx < sidebarQuestions.length - 1
+    ? sidebarQuestions[currentQuestionIdx + 1]
+    : null;
+
+  const handleNextQuestion = () => {
+    if (!nextQuestion) return;
+    trackEvent('click', 'next_question_button');
+    handleSelectQuestion(nextQuestion);
+  };
 
   return (
     <div className="app-root">
@@ -430,6 +471,7 @@ export default function App() {
             />
 
             <SqlPlayground
+              key={activeQuestion ? activeQuestion.id : 'no-question'}
               currentQuestion={activeQuestion}
               userSql={userSql}
               setUserSql={setUserSql}
@@ -439,6 +481,8 @@ export default function App() {
               isSolved={activeQuestion ? solvedQuestionIds.has(activeQuestion.id) : false}
               sqlDialect={sqlDialect}
               onSwitchDialect={setSqlDialect}
+              onNextQuestion={handleNextQuestion}
+              hasNextQuestion={Boolean(nextQuestion)}
             />
 
             <SchemaSidebar
