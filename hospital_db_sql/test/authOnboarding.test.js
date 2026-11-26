@@ -1,8 +1,9 @@
 process.env.NODE_ENV = 'test';
 import assert from 'assert';
 import http from 'http';
-import app from '../server/index.js';
 import { generateJWT, verifyJWT, hashPassword, generateSalt, verifyPassword } from '../server/utils/auth.js';
+
+const { default: app } = await import('../server/index.js');
 
 console.log(`\n====================================================`);
 console.log(`🚀  SQL PLAYGROUND USER ONBOARDING & AUTH TEST SUITE`);
@@ -100,20 +101,84 @@ async function runAuthSuite() {
 
   try {
     let authToken = '';
+    const testUsername = `student_${Date.now()}`;
+    const testEmail = `${testUsername}@sqlmaster.edu`;
+    const initialPassword = 'ValidPassword123!';
+    const updatedPassword = 'UpdatedStrongPass!2026';
+    const securityAnswer = 'Fluffy';
+
+    await asyncTest('API: Rejects weak password on registration (400)', async () => {
+      const res = await makeRequest('/api/auth/register', 'POST', {
+        username: `${testUsername}_weak`,
+        email: `${testUsername}_weak@sqlmaster.edu`,
+        password: 'short8!',
+        securityQuestion: "What was your first pet's name?",
+        securityAnswer
+      });
+
+      assert.strictEqual(res.status, 400);
+      assert.strictEqual(res.body.success, false);
+    });
 
     await asyncTest('API: User Registration (/api/auth/register)', async () => {
       const res = await makeRequest('/api/auth/register', 'POST', {
-        username: `student_${Date.now()}`,
-        email: `student_${Date.now()}@sqlmaster.edu`,
-        password: 'ValidPassword123!',
+        username: testUsername,
+        email: testEmail,
+        password: initialPassword,
         fullName: 'Dr. SQL Student',
-        targetTrack: 'healthcare'
+        targetTrack: 'healthcare',
+        securityQuestion: "What was your first pet's name?",
+        securityAnswer
       });
 
       assert.strictEqual(res.status, 201);
       assert.strictEqual(res.body.success, true);
       assert.ok(res.body.token);
       assert.strictEqual(res.body.user.role, 'STUDENT');
+      authToken = res.body.token;
+    });
+
+    await asyncTest('API: Rejects duplicate registration (409)', async () => {
+      const res = await makeRequest('/api/auth/register', 'POST', {
+        username: testUsername,
+        email: testEmail,
+        password: initialPassword
+      });
+
+      assert.strictEqual(res.status, 409);
+      assert.strictEqual(res.body.success, false);
+    });
+
+    await asyncTest('API: Rejects unknown user login even with strong password (401)', async () => {
+      const res = await makeRequest('/api/auth/login', 'POST', {
+        usernameOrEmail: `nonexistent_${Date.now()}`,
+        password: 'SuperStrongPassword!2026'
+      });
+
+      assert.strictEqual(res.status, 401);
+      assert.strictEqual(res.body.success, false);
+    });
+
+    await asyncTest('API: Rejects invalid password on login (401)', async () => {
+      const res = await makeRequest('/api/auth/login', 'POST', {
+        usernameOrEmail: testUsername,
+        password: 'WrongPassword123!'
+      });
+
+      assert.strictEqual(res.status, 401);
+      assert.strictEqual(res.body.success, false);
+    });
+
+    await asyncTest('API: Login succeeds with registered email or username (200)', async () => {
+      const res = await makeRequest('/api/auth/login', 'POST', {
+        usernameOrEmail: testEmail,
+        password: initialPassword
+      });
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.body.success, true);
+      assert.ok(res.body.token);
+      assert.strictEqual(res.body.user.username, testUsername);
       authToken = res.body.token;
     });
 
@@ -141,6 +206,30 @@ async function runAuthSuite() {
       assert.strictEqual(res.status, 200);
       assert.strictEqual(res.body.success, true);
       assert.ok(res.body.progress.solvedQuestions.includes('hosp_beg_1'));
+    });
+
+    await asyncTest('API: Password Reset rejects wrong answer and succeeds with valid answer', async () => {
+      const wrongRes = await makeRequest('/api/auth/reset-password', 'POST', {
+        usernameOrEmail: testUsername,
+        securityAnswer: 'WrongPet',
+        newPassword: updatedPassword
+      });
+      assert.strictEqual(wrongRes.status, 401);
+
+      const okRes = await makeRequest('/api/auth/reset-password', 'POST', {
+        usernameOrEmail: testUsername,
+        securityAnswer: 'fluffy',
+        newPassword: updatedPassword
+      });
+      assert.strictEqual(okRes.status, 200);
+      assert.strictEqual(okRes.body.success, true);
+
+      const loginNewRes = await makeRequest('/api/auth/login', 'POST', {
+        usernameOrEmail: testUsername,
+        password: updatedPassword
+      });
+      assert.strictEqual(loginNewRes.status, 200);
+      assert.strictEqual(loginNewRes.body.success, true);
     });
 
   } finally {

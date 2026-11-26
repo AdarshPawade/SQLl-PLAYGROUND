@@ -2,13 +2,21 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Lock, User, Mail, Key, ShieldCheck, CheckCircle2, AlertCircle, 
   LogOut, RefreshCw, Trophy, UserCheck, HelpCircle,
-  Sparkles, Layers
+  Sparkles, Layers, Eye, EyeOff, ArrowRight
 } from 'lucide-react';
 import { 
   registerUser, authenticateUser, resetPassword, getActiveSession, 
-  clearActiveSession, getUserProgress 
+  clearActiveSession, getUserProgress, validateClientPasswordPolicy,
+  syncCloudUserToLocalSession, mergeCloudProgressIntoLocal
 } from '../utils/cryptoAuth.js';
-import { registerApi, loginApi, syncProgressApi, logoutApi } from '../services/api.js';
+import {
+  registerApi,
+  loginApi,
+  resetPasswordApi,
+  fetchUserProgress,
+  syncProgressApi,
+  logoutApi
+} from '../services/api.js';
 import './AuthSystem.css';
 
 
@@ -81,11 +89,11 @@ function LiquidGLCanvas() {
   return <canvas ref={canvasRef} className="liquid-gl-canvas" />;
 }
 
-export default function AuthSystem({ onSessionChange }) {
-  const [currentUser, setCurrentUser] = useState(() => getActiveSession());
-  const [activeTab, setActiveTab] = useState(() => getActiveSession() ? 'dashboard' : 'login');
+export default function AuthSystem({ currentUser: propUser, onSessionChange, onNavigatePlayground }) {
+  const [currentUser, setCurrentUser] = useState(() => propUser || getActiveSession());
+  const [activeTab, setActiveTab] = useState(() => (propUser || getActiveSession()) ? 'dashboard' : 'login');
   const [userProgress, setUserProgress] = useState(() => {
-    const session = getActiveSession();
+    const session = propUser || getActiveSession();
     const userKey = session?.username || 'guest';
     return getUserProgress(userKey) || {
       completedChallenges: [],
@@ -113,8 +121,21 @@ export default function AuthSystem({ onSessionChange }) {
     confirmPassword: ''
   });
 
-  // UI Feedback States
+  // UI Feedback & Visibility States
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPasswords, setShowPasswords] = useState({
+    login: false,
+    signup: false,
+    forgot: false
+  });
+  const alertTimerRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (alertTimerRef.current) clearTimeout(alertTimerRef.current);
+    };
+  }, []);
 
   // Load Session-Isolated User Progress
   const loadUserProgress = useCallback((username) => {
@@ -130,123 +151,245 @@ export default function AuthSystem({ onSessionChange }) {
   }, []);
 
   const handleAlert = (type, text) => {
+    if (alertTimerRef.current) clearTimeout(alertTimerRef.current);
     setMessage({ type, text });
-    setTimeout(() => setMessage({ type: '', text: '' }), 6000);
+    alertTimerRef.current = setTimeout(() => setMessage({ type: '', text: '' }), 6000);
   };
 
-  // Sign-Up Handler
+  const switchTab = (tab) => {
+    setMessage({ type: '', text: '' });
+    setActiveTab(tab);
+  };
+
+  // Sign-Up Handler (Cloud-first with clean offline local fallback)
   const handleSignUp = async (e) => {
     e.preventDefault();
     setMessage({ type: '', text: '' });
 
-    if (!signupForm.username || !signupForm.email || !signupForm.password || !signupForm.securityAnswer) {
+    const cleanUsername = signupForm.username.trim().toLowerCase();
+    const cleanEmail = signupForm.email.trim().toLowerCase();
+
+    if (!cleanUsername || !cleanEmail || !signupForm.password || !signupForm.securityAnswer.trim()) {
       return handleAlert('error', 'Please complete all required fields.');
+    }
+
+    if (!/^[a-zA-Z0-9_.-]{3,32}$/.test(cleanUsername)) {
+      return handleAlert('error', 'Username must be 3-32 characters (letters, numbers, dots, dashes, or underscores).');
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      return handleAlert('error', 'Please enter a valid email address.');
+    }
+
+    const passCheck = validateClientPasswordPolicy(signupForm.password);
+    if (!passCheck.valid) {
+      return handleAlert('error', passCheck.reason);
     }
 
     if (signupForm.password !== signupForm.confirmPassword) {
       return handleAlert('error', 'Passwords do not match.');
     }
 
-    if (signupForm.password.length < 8) {
-      return handleAlert('error', 'Password must be at least 8 characters long.');
-    }
-
-    // Try cloud backend registration first
+    setIsSubmitting(true);
     try {
-      await registerApi({
-        username: signupForm.username,
-        email: signupForm.email,
+      const cloudRes = await registerApi({
+        username: cleanUsername,
+        email: cleanEmail,
         password: signupForm.password,
-        fullName: signupForm.username
+        fullName: signupForm.username.trim(),
+        securityQuestion: signupForm.securityQuestion,
+        securityAnswer: signupForm.securityAnswer.trim()
       });
-    } catch {
-      // Fallback continues locally
-    }
 
-    const res = await registerUser({
-      username: signupForm.username,
-      email: signupForm.email,
-      password: signupForm.password,
-      securityQuestion: signupForm.securityQuestion,
-      securityAnswer: signupForm.securityAnswer
-    });
+      if (cloudRes.success && cloudRes.user) {
+        // Mirror local offline credentials best-effort and initialize active session immediately
+        await registerUser({
+          username: signupForm.username.trim(),
+          email: cleanEmail,
+          password: signupForm.password,
+          securityQuestion: signupForm.securityQuestion,
+          securityAnswer: signupForm.securityAnswer.trim()
+        }).catch(() => {});
 
-    if (res.success) {
-      handleAlert('success', 'Account created successfully! You can now log in.');
-      setSignupForm({
-        username: '', email: '', password: '', confirmPassword: '',
-        securityQuestion: 'What was your first pet\'s name?', securityAnswer: ''
+        const sessionUser = syncCloudUserToLocalSession(cloudRes.user);
+        setCurrentUser(sessionUser);
+
+        // Sync any prior guest progress into the newly created account
+        try {
+          const guestProg = getUserProgress('guest');
+          if (guestProg && (guestProg.completedChallenges?.length > 0)) {
+            const syncRes = await syncProgressApi(guestProg);
+            if (syncRes?.success && syncRes.progress) {
+              mergeCloudProgressIntoLocal(sessionUser.username, syncRes.progress);
+            }
+          }
+        } catch {}
+
+        loadUserProgress(sessionUser.username);
+        setSignupForm({
+          username: '', email: '', password: '', confirmPassword: '',
+          securityQuestion: 'What was your first pet\'s name?', securityAnswer: ''
+        });
+        setActiveTab('dashboard');
+        handleAlert('success', `Account created! Welcome to SQL Playground, ${sessionUser.displayName}.`);
+        if (onSessionChange) onSessionChange(sessionUser);
+        return;
+      }
+
+      // Surface server validation / duplicate-account errors directly instead of masking them
+      if (!cloudRes.networkError) {
+        return handleAlert('error', cloudRes.error || 'Could not create account. Please check your details.');
+      }
+
+      // Offline fallback when backend server is unreachable
+      const localRes = await registerUser({
+        username: signupForm.username.trim(),
+        email: cleanEmail,
+        password: signupForm.password,
+        securityQuestion: signupForm.securityQuestion,
+        securityAnswer: signupForm.securityAnswer.trim()
       });
-      setActiveTab('login');
-    } else {
-      handleAlert('error', res.error);
+
+      if (localRes.success) {
+        const authRes = await authenticateUser(cleanUsername, signupForm.password);
+        if (authRes.success) {
+          setCurrentUser(authRes.user);
+          loadUserProgress(authRes.user.username);
+          setActiveTab('dashboard');
+          if (onSessionChange) onSessionChange(authRes.user);
+        } else {
+          setActiveTab('login');
+        }
+        setSignupForm({
+          username: '', email: '', password: '', confirmPassword: '',
+          securityQuestion: 'What was your first pet\'s name?', securityAnswer: ''
+        });
+        handleAlert('success', 'Account created in local offline mode!');
+      } else {
+        handleAlert('error', localRes.error);
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  // Login Handler with Cloud Sync Bridge
+  // Login Handler (Cloud-first with cross-device progress sync & offline fallback)
   const handleLogin = async (e) => {
     e.preventDefault();
     setMessage({ type: '', text: '' });
 
-    if (!loginForm.usernameOrEmail || !loginForm.password) {
+    const identifier = loginForm.usernameOrEmail.trim();
+    if (!identifier || !loginForm.password) {
       return handleAlert('error', 'Please enter your username/email and password.');
     }
 
-    // Attempt Backend Cloud Authentication
+    setIsSubmitting(true);
     try {
-      await loginApi({
-        usernameOrEmail: loginForm.usernameOrEmail,
+      const cloudRes = await loginApi({
+        usernameOrEmail: identifier,
         password: loginForm.password
       });
-    } catch {
-      // Fallback continues locally
-    }
 
-    const res = await authenticateUser(loginForm.usernameOrEmail, loginForm.password);
-    if (res.success) {
-      setCurrentUser(res.user);
-      loadUserProgress(res.user.username);
-      setActiveTab('dashboard');
-      handleAlert('success', `Welcome back, ${res.user.displayName || res.user.username}!`);
-      if (onSessionChange) onSessionChange(res.user);
+      if (cloudRes.success && cloudRes.user) {
+        const sessionUser = syncCloudUserToLocalSession(cloudRes.user);
 
-      // Auto-sync guest progress to cloud account
-      try {
-        const guestProg = getUserProgress('guest');
-        if (guestProg && (guestProg.completedChallenges?.length > 0 || guestProg.unlockedProgress)) {
-          syncProgressApi(guestProg).catch(() => {});
-        }
-      } catch {}
-    } else {
-      handleAlert('error', res.error);
+        // Fetch and merge this user's cloud progress
+        try {
+          const cloudProgRes = await fetchUserProgress(cloudRes.user.id);
+          if (cloudProgRes?.success && cloudProgRes.progress) {
+            mergeCloudProgressIntoLocal(sessionUser.username, cloudProgRes.progress);
+          }
+        } catch {}
+
+        setCurrentUser(sessionUser);
+        loadUserProgress(sessionUser.username);
+        setLoginForm({ usernameOrEmail: '', password: '' });
+        setActiveTab('dashboard');
+        handleAlert('success', `Welcome back, ${sessionUser.displayName || sessionUser.username}!`);
+        if (onSessionChange) onSessionChange(sessionUser);
+        return;
+      }
+
+      if (!cloudRes.networkError) {
+        return handleAlert('error', cloudRes.error || 'Invalid username/email or password.');
+      }
+
+      // Offline fallback when backend server is unreachable
+      const localRes = await authenticateUser(identifier, loginForm.password);
+      if (localRes.success) {
+        setCurrentUser(localRes.user);
+        loadUserProgress(localRes.user.username);
+        setLoginForm({ usernameOrEmail: '', password: '' });
+        setActiveTab('dashboard');
+        handleAlert('success', `Welcome back, ${localRes.user.displayName || localRes.user.username}! (Local Mode)`);
+        if (onSessionChange) onSessionChange(localRes.user);
+      } else {
+        handleAlert('error', localRes.error);
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  // Password Reset Handler
+  // Password Reset Handler (Cloud + local)
   const handleForgotPassword = async (e) => {
     e.preventDefault();
     setMessage({ type: '', text: '' });
 
-    if (!forgotForm.usernameOrEmail || !forgotForm.securityAnswer || !forgotForm.newPassword) {
+    if (!forgotForm.usernameOrEmail.trim() || !forgotForm.securityAnswer.trim() || !forgotForm.newPassword) {
       return handleAlert('error', 'Please complete all fields.');
+    }
+
+    const passCheck = validateClientPasswordPolicy(forgotForm.newPassword);
+    if (!passCheck.valid) {
+      return handleAlert('error', passCheck.reason);
     }
 
     if (forgotForm.newPassword !== forgotForm.confirmPassword) {
       return handleAlert('error', 'Passwords do not match.');
     }
 
-    const res = await resetPassword({
-      usernameOrEmail: forgotForm.usernameOrEmail,
-      securityAnswer: forgotForm.securityAnswer,
-      newPassword: forgotForm.newPassword
-    });
+    setIsSubmitting(true);
+    try {
+      const cloudRes = await resetPasswordApi({
+        usernameOrEmail: forgotForm.usernameOrEmail.trim(),
+        securityAnswer: forgotForm.securityAnswer.trim(),
+        newPassword: forgotForm.newPassword
+      });
 
-    if (res.success) {
-      handleAlert('success', res.message);
-      setForgotForm({ usernameOrEmail: '', securityAnswer: '', newPassword: '', confirmPassword: '' });
-      setActiveTab('login');
-    } else {
-      handleAlert('error', res.error);
+      if (cloudRes.success) {
+        // Mirror reset locally if a local cache record exists
+        await resetPassword({
+          usernameOrEmail: forgotForm.usernameOrEmail.trim(),
+          securityAnswer: forgotForm.securityAnswer.trim(),
+          newPassword: forgotForm.newPassword
+        }).catch(() => {});
+
+        handleAlert('success', cloudRes.message || 'Password reset successfully! You can now log in.');
+        setForgotForm({ usernameOrEmail: '', securityAnswer: '', newPassword: '', confirmPassword: '' });
+        setActiveTab('login');
+        return;
+      }
+
+      if (!cloudRes.networkError) {
+        return handleAlert('error', cloudRes.error || 'Could not reset password.');
+      }
+
+      const localRes = await resetPassword({
+        usernameOrEmail: forgotForm.usernameOrEmail.trim(),
+        securityAnswer: forgotForm.securityAnswer.trim(),
+        newPassword: forgotForm.newPassword
+      });
+
+      if (localRes.success) {
+        handleAlert('success', localRes.message);
+        setForgotForm({ usernameOrEmail: '', securityAnswer: '', newPassword: '', confirmPassword: '' });
+        setActiveTab('login');
+      } else {
+        handleAlert('error', localRes.error);
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -257,9 +400,12 @@ export default function AuthSystem({ onSessionChange }) {
     setCurrentUser(null);
     setUserProgress(null);
     setActiveTab('login');
-    handleAlert('success', 'Logged out safely. Client-side session cleared.');
+    handleAlert('success', 'Logged out safely. Session cleared.');
     if (onSessionChange) onSessionChange(null);
   };
+
+  const signupChecks = validateClientPasswordPolicy(signupForm.password).checks;
+  const forgotChecks = validateClientPasswordPolicy(forgotForm.newPassword).checks;
 
 
   return (
@@ -272,20 +418,23 @@ export default function AuthSystem({ onSessionChange }) {
         {!currentUser ? (
           <>
             <button 
+              type="button"
               className={`auth-tab-btn ${activeTab === 'login' ? 'active' : ''}`}
-              onClick={() => setActiveTab('login')}
+              onClick={() => switchTab('login')}
             >
               <Lock className="w-4 h-4 mr-2" /> Sign In
             </button>
             <button 
+              type="button"
               className={`auth-tab-btn ${activeTab === 'signup' ? 'active' : ''}`}
-              onClick={() => setActiveTab('signup')}
+              onClick={() => switchTab('signup')}
             >
               <User className="w-4 h-4 mr-2" /> Create Account
             </button>
             <button 
+              type="button"
               className={`auth-tab-btn ${activeTab === 'forgot' ? 'active' : ''}`}
-              onClick={() => setActiveTab('forgot')}
+              onClick={() => switchTab('forgot')}
             >
               <Key className="w-4 h-4 mr-2" /> Recover Account
             </button>
@@ -337,22 +486,33 @@ export default function AuthSystem({ onSessionChange }) {
 
           <div className="form-group">
             <label><Lock className="w-4 h-4 inline mr-1 text-cyan-400" /> Password</label>
-            <input 
-              type="password" 
-              placeholder="Enter your password"
-              value={loginForm.password}
-              onChange={e => setLoginForm({ ...loginForm, password: e.target.value })}
-              required
-            />
+            <div className="password-input-wrap">
+              <input 
+                type={showPasswords.login ? 'text' : 'password'}
+                placeholder="Enter your password"
+                autoComplete="current-password"
+                value={loginForm.password}
+                onChange={e => setLoginForm({ ...loginForm, password: e.target.value })}
+                required
+              />
+              <button
+                type="button"
+                className="password-toggle-btn"
+                onClick={() => setShowPasswords(p => ({ ...p, login: !p.login }))}
+                aria-label={showPasswords.login ? 'Hide password' : 'Show password'}
+              >
+                {showPasswords.login ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
           </div>
 
-          <button type="submit" className="auth-submit-btn primary liquid-btn">
-            <ShieldCheck className="w-4 h-4 mr-2" /> Sign In
+          <button type="submit" disabled={isSubmitting} className="auth-submit-btn primary liquid-btn">
+            <ShieldCheck className="w-4 h-4 mr-2" /> {isSubmitting ? 'Signing In...' : 'Sign In'}
           </button>
 
           <div className="auth-footer-links">
-            <span onClick={() => setActiveTab('forgot')}>Forgot Password?</span>
-            <span onClick={() => setActiveTab('signup')}>Need an account? Sign Up</span>
+            <span onClick={() => switchTab('forgot')}>Forgot Password?</span>
+            <span onClick={() => switchTab('signup')}>Need an account? Sign Up</span>
           </div>
         </form>
       )}
@@ -396,25 +556,45 @@ export default function AuthSystem({ onSessionChange }) {
           <div className="form-row">
             <div className="form-group flex-1">
               <label><Lock className="w-4 h-4 inline mr-1 text-indigo-400" /> Password</label>
-              <input 
-                type="password" 
-                placeholder="At least 8 characters"
-                value={signupForm.password}
-                onChange={e => setSignupForm({ ...signupForm, password: e.target.value })}
-                required
-              />
+              <div className="password-input-wrap">
+                <input 
+                  type={showPasswords.signup ? 'text' : 'password'}
+                  placeholder="At least 12 characters"
+                  autoComplete="new-password"
+                  value={signupForm.password}
+                  onChange={e => setSignupForm({ ...signupForm, password: e.target.value })}
+                  required
+                />
+                <button
+                  type="button"
+                  className="password-toggle-btn"
+                  onClick={() => setShowPasswords(p => ({ ...p, signup: !p.signup }))}
+                  aria-label={showPasswords.signup ? 'Hide password' : 'Show password'}
+                >
+                  {showPasswords.signup ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
 
             <div className="form-group flex-1">
               <label><Lock className="w-4 h-4 inline mr-1 text-indigo-400" /> Confirm Password</label>
               <input 
-                type="password" 
+                type={showPasswords.signup ? 'text' : 'password'}
                 placeholder="Re-enter password"
+                autoComplete="new-password"
                 value={signupForm.confirmPassword}
                 onChange={e => setSignupForm({ ...signupForm, confirmPassword: e.target.value })}
                 required
               />
             </div>
+          </div>
+
+          <div className="password-rules-grid">
+            <span className={`rule-pill ${signupChecks.minLength ? 'met' : ''}`}>12+ chars</span>
+            <span className={`rule-pill ${signupChecks.hasUpper ? 'met' : ''}`}>Uppercase</span>
+            <span className={`rule-pill ${signupChecks.hasLower ? 'met' : ''}`}>Lowercase</span>
+            <span className={`rule-pill ${signupChecks.hasDigit ? 'met' : ''}`}>Number</span>
+            <span className={`rule-pill ${signupChecks.hasSpecial ? 'met' : ''}`}>Special char</span>
           </div>
 
           <div className="form-group">
@@ -434,19 +614,19 @@ export default function AuthSystem({ onSessionChange }) {
             <label><Key className="w-4 h-4 inline mr-1 text-emerald-400" /> Security Answer</label>
             <input 
               type="text" 
-              placeholder="Answer used for client-side password recovery"
+              placeholder="Answer used for password recovery"
               value={signupForm.securityAnswer}
               onChange={e => setSignupForm({ ...signupForm, securityAnswer: e.target.value })}
               required
             />
           </div>
 
-          <button type="submit" className="auth-submit-btn success liquid-btn">
-            <UserCheck className="w-4 h-4 mr-2" /> Create Account
+          <button type="submit" disabled={isSubmitting} className="auth-submit-btn success liquid-btn">
+            <UserCheck className="w-4 h-4 mr-2" /> {isSubmitting ? 'Creating Account...' : 'Create Account'}
           </button>
 
           <div className="auth-footer-links">
-            <span onClick={() => setActiveTab('login')}>Already have an account? Log In</span>
+            <span onClick={() => switchTab('login')}>Already have an account? Log In</span>
           </div>
         </form>
       )}
@@ -490,20 +670,32 @@ export default function AuthSystem({ onSessionChange }) {
           <div className="form-row">
             <div className="form-group flex-1">
               <label><Lock className="w-4 h-4 inline mr-1 text-indigo-400" /> New Password</label>
-              <input 
-                type="password" 
-                placeholder="New password"
-                value={forgotForm.newPassword}
-                onChange={e => setForgotForm({ ...forgotForm, newPassword: e.target.value })}
-                required
-              />
+              <div className="password-input-wrap">
+                <input 
+                  type={showPasswords.forgot ? 'text' : 'password'}
+                  placeholder="At least 12 characters"
+                  autoComplete="new-password"
+                  value={forgotForm.newPassword}
+                  onChange={e => setForgotForm({ ...forgotForm, newPassword: e.target.value })}
+                  required
+                />
+                <button
+                  type="button"
+                  className="password-toggle-btn"
+                  onClick={() => setShowPasswords(p => ({ ...p, forgot: !p.forgot }))}
+                  aria-label={showPasswords.forgot ? 'Hide password' : 'Show password'}
+                >
+                  {showPasswords.forgot ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
 
             <div className="form-group flex-1">
               <label><Lock className="w-4 h-4 inline mr-1 text-indigo-400" /> Confirm New Password</label>
               <input 
-                type="password" 
+                type={showPasswords.forgot ? 'text' : 'password'}
                 placeholder="Re-enter new password"
+                autoComplete="new-password"
                 value={forgotForm.confirmPassword}
                 onChange={e => setForgotForm({ ...forgotForm, confirmPassword: e.target.value })}
                 required
@@ -511,12 +703,20 @@ export default function AuthSystem({ onSessionChange }) {
             </div>
           </div>
 
-          <button type="submit" className="auth-submit-btn warning liquid-btn">
-            <RefreshCw className="w-4 h-4 mr-2" /> Reset Password
+          <div className="password-rules-grid">
+            <span className={`rule-pill ${forgotChecks.minLength ? 'met' : ''}`}>12+ chars</span>
+            <span className={`rule-pill ${forgotChecks.hasUpper ? 'met' : ''}`}>Uppercase</span>
+            <span className={`rule-pill ${forgotChecks.hasLower ? 'met' : ''}`}>Lowercase</span>
+            <span className={`rule-pill ${forgotChecks.hasDigit ? 'met' : ''}`}>Number</span>
+            <span className={`rule-pill ${forgotChecks.hasSpecial ? 'met' : ''}`}>Special char</span>
+          </div>
+
+          <button type="submit" disabled={isSubmitting} className="auth-submit-btn warning liquid-btn">
+            <RefreshCw className="w-4 h-4 mr-2" /> {isSubmitting ? 'Resetting...' : 'Reset Password'}
           </button>
 
           <div className="auth-footer-links">
-            <span onClick={() => setActiveTab('login')}>Back to Log In</span>
+            <span onClick={() => switchTab('login')}>Back to Log In</span>
           </div>
         </form>
       )}
@@ -537,9 +737,17 @@ export default function AuthSystem({ onSessionChange }) {
               </div>
             </div>
 
-            <button className="logout-btn" onClick={handleLogout}>
-              <LogOut className="w-4 h-4 mr-2" /> Sign Out
-            </button>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              {onNavigatePlayground && (
+                <button type="button" className="auth-go-playground-btn" onClick={onNavigatePlayground}>
+                  <span>Start Practicing</span>
+                  <ArrowRight className="w-4 h-4 ml-1" />
+                </button>
+              )}
+              <button type="button" className="logout-btn" onClick={handleLogout}>
+                <LogOut className="w-4 h-4 mr-2" /> Sign Out
+              </button>
+            </div>
           </div>
 
           {/* Metrics Stats Row */}

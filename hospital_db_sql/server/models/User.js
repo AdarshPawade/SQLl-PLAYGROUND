@@ -47,6 +47,18 @@ const userSchema = new mongoose.Schema({
     type: Boolean, 
     default: false 
   },
+  securityQuestion: {
+    type: String,
+    default: ''
+  },
+  securityAnswerHash: {
+    type: String,
+    default: ''
+  },
+  securityAnswerSalt: {
+    type: String,
+    default: ''
+  },
   createdAt: { 
     type: Date, 
     default: Date.now 

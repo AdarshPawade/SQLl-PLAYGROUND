@@ -61,43 +61,68 @@ export async function fetchHealthStatus() {
   }
 }
 
-export async function registerApi(userData) {
+async function requestJson(url, options = {}) {
   try {
-    const res = await fetch(`${API_BASE}/auth/register`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(userData)
+    const res = await fetch(url, {
+      credentials: 'include',
+      ...options
     });
-    const data = await res.json();
-    if (data.token) {
-      setStoredAuthToken(data.token);
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      return {
+        success: false,
+        networkError: res.status >= 500,
+        httpStatus: res.status,
+        error: res.status >= 500 ? 'Authentication service temporarily unavailable.' : 'Unexpected response from server.'
+      };
     }
-    return data;
+    const data = await res.json();
+    return { ...data, httpStatus: res.status, networkError: false };
   } catch (err) {
-    return { success: false, error: err.message };
+    return {
+      success: false,
+      networkError: true,
+      error: err?.message || 'Network error while contacting server.'
+    };
   }
 }
 
-export async function loginApi(credentials) {
-  try {
-    const res = await fetch(`${API_BASE}/auth/login`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(credentials)
-    });
-    const data = await res.json();
-    if (data.token) {
-      setStoredAuthToken(data.token);
-    }
-    return data;
-  } catch (err) {
-    return { success: false, error: err.message };
+export async function registerApi(userData) {
+  const data = await requestJson(`${API_BASE}/auth/register`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(userData)
+  });
+  if (data.success && data.token) {
+    setStoredAuthToken(data.token);
   }
+  return data;
+}
+
+export async function loginApi(credentials) {
+  const data = await requestJson(`${API_BASE}/auth/login`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(credentials)
+  });
+  if (data.success && data.token) {
+    setStoredAuthToken(data.token);
+  }
+  return data;
+}
+
+export async function resetPasswordApi(resetPayload) {
+  return requestJson(`${API_BASE}/auth/reset-password`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(resetPayload)
+  });
 }
 
 export async function fetchMeApi() {
   try {
     const res = await fetch(`${API_BASE}/auth/me`, {
+      credentials: 'include',
       headers: getAuthHeaders()
     });
     if (!res.ok) return null;
@@ -112,6 +137,7 @@ export async function logoutApi() {
   try {
     await fetch(`${API_BASE}/auth/logout`, {
       method: 'POST',
+      credentials: 'include',
       headers: getAuthHeaders()
     });
   } catch {}

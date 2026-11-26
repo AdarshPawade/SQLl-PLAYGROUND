@@ -13,7 +13,19 @@ import AdminDashboard from './pages/AdminDashboard';
 import { Code2, ListOrdered, Database } from 'lucide-react';
 import { trackEvent } from './utils/tracker';
 
-import { getActiveSession, getUserProgress, saveUserProgress } from './utils/cryptoAuth.js';
+import {
+  getActiveSession,
+  getUserProgress,
+  saveUserProgress,
+  syncCloudUserToLocalSession,
+  mergeCloudProgressIntoLocal
+} from './utils/cryptoAuth.js';
+import {
+  getStoredAuthToken,
+  fetchMeApi,
+  fetchUserProgress,
+  syncProgressApi
+} from './services/api.js';
 
 import {
   EMPLOYEE_SCHEMA_INFO,
@@ -137,6 +149,41 @@ function SqlPlaygroundStudio() {
     setValidationResult(null);
     setUserQueryExecuted(false);
   };
+
+  // Re-hydrate cloud session & progress if an auth token is present
+  useEffect(() => {
+    const token = getStoredAuthToken();
+    if (!token) return;
+
+    let cancelled = false;
+    (async () => {
+      const meRes = await fetchMeApi();
+      if (cancelled || !meRes?.success || !meRes.user) return;
+
+      const sessionUser = syncCloudUserToLocalSession(meRes.user);
+      if (!sessionUser) return;
+
+      const cloudProgRes = await fetchUserProgress(meRes.user.id);
+      if (!cancelled && cloudProgRes?.success && cloudProgRes.progress) {
+        mergeCloudProgressIntoLocal(sessionUser.username, cloudProgRes.progress);
+      }
+
+      if (!cancelled) {
+        setCurrentUser(sessionUser);
+        const merged = getUserProgress(sessionUser.username);
+        if (merged) {
+          setSolvedQuestionIds(new Set(merged.completedChallenges || []));
+          if (merged.unlockedProgress) {
+            setUnlockedProgressMap(merged.unlockedProgress);
+          }
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Re-init DB when activeDbKey changes (with async race condition safeguard and WASM disposal)
   useEffect(() => {
@@ -326,19 +373,33 @@ function SqlPlaygroundStudio() {
 
         setUnlockedProgressMap(updatedUnlockedMap);
 
-        // Persist strictly to active user's isolated profile
+        // Persist strictly to active user's isolated profile (+ cloud sync if signed in)
         const activeUserKey = currentUser && currentUser.username ? currentUser.username : 'guest';
+        const completedList = Array.from(newSolved);
         saveUserProgress(activeUserKey, {
-          completedChallenges: Array.from(newSolved),
+          completedChallenges: completedList,
           unlockedProgress: updatedUnlockedMap
         });
+        if (currentUser && getStoredAuthToken()) {
+          syncProgressApi({
+            completedChallenges: completedList,
+            unlockedProgress: updatedUnlockedMap
+          }).catch(() => {});
+        }
       } else {
         // Persist solved interview question
         const activeUserKey = currentUser && currentUser.username ? currentUser.username : 'guest';
+        const completedList = Array.from(newSolved);
         saveUserProgress(activeUserKey, {
-          completedChallenges: Array.from(newSolved),
+          completedChallenges: completedList,
           unlockedProgress: unlockedProgressMap
         });
+        if (currentUser && getStoredAuthToken()) {
+          syncProgressApi({
+            completedChallenges: completedList,
+            unlockedProgress: unlockedProgressMap
+          }).catch(() => {});
+        }
       }
     }
   };
@@ -498,6 +559,7 @@ function SqlPlaygroundStudio() {
         <AuthSystem
           currentUser={currentUser}
           onSessionChange={handleSessionChange}
+          onNavigatePlayground={() => handleNavigate('dashboard')}
         />
       )}
 

@@ -140,10 +140,22 @@ const analyticsTrackLimiter = rateLimit({
   message: { success: false, error: 'Analytics rate limit exceeded.' }
 });
 
+const authBruteForceLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 30, // Max 30 auth attempts per 15 min per IP
+  skip: () => process.env.NODE_ENV === 'test',
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Too many authentication attempts. Please try again in a few minutes.' }
+});
+
 app.use('/api', generalApiLimiter);
 app.use('/api/execute', executeStrictLimiter);
 app.use('/api/analytics/stats', adminStatsLimiter);
 app.use('/api/analytics/track', analyticsTrackLimiter);
+app.use('/api/auth/login', authBruteForceLimiter);
+app.use('/api/auth/register', authBruteForceLimiter);
+app.use('/api/auth/reset-password', authBruteForceLimiter);
 
 // Register Core Public API Routes
 app.use('/api/health', healthRoute);

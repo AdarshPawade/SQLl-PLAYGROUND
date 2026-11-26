@@ -65,6 +65,36 @@ export function sanitizeInput(input) {
     .replace(/\//g, '&#x2F;');
 }
 
+export function normalizeIdentifier(input) {
+  if (typeof input !== 'string') return '';
+  return input.trim().toLowerCase().replace(/[<>]/g, '');
+}
+
+// Mirrors backend password policy (server/utils/auth.js)
+export function validateClientPasswordPolicy(password) {
+  if (!password || typeof password !== 'string') {
+    return { valid: false, reason: 'Password is required.', checks: {} };
+  }
+  const checks = {
+    minLength: password.length >= 12,
+    hasUpper: /[A-Z]/.test(password),
+    hasLower: /[a-z]/.test(password),
+    hasDigit: /[0-9]/.test(password),
+    hasSpecial: /[^A-Za-z0-9]/.test(password)
+  };
+  if (!checks.minLength) {
+    return { valid: false, reason: 'Password must be at least 12 characters long.', checks };
+  }
+  if (!checks.hasUpper || !checks.hasLower || !checks.hasDigit || !checks.hasSpecial) {
+    return {
+      valid: false,
+      reason: 'Password must include uppercase, lowercase, a number, and a special character.',
+      checks
+    };
+  }
+  return { valid: true, reason: '', checks };
+}
+
 // Local Storage User Registry Key
 const USERS_STORAGE_KEY = 'sql_playground_users_v1';
 const SESSION_STORAGE_KEY = 'sql_playground_active_session_v1';
@@ -84,8 +114,8 @@ export function getRegisteredUsers() {
 // Register a new client-side account
 export async function registerUser({ username, email, password, securityQuestion, securityAnswer }) {
   const users = getRegisteredUsers();
-  const cleanUsername = sanitizeInput(username.trim().toLowerCase());
-  const cleanEmail = sanitizeInput(email.trim().toLowerCase());
+  const cleanUsername = normalizeIdentifier(username);
+  const cleanEmail = normalizeIdentifier(email);
 
   // Duplicate account check
   if (users[cleanUsername]) {
@@ -145,7 +175,7 @@ export async function registerUser({ username, email, password, securityQuestion
 // Authenticate user against stored client-side hash
 export async function authenticateUser(usernameOrEmail, password) {
   const users = getRegisteredUsers();
-  const identifier = sanitizeInput(usernameOrEmail.trim().toLowerCase());
+  const identifier = normalizeIdentifier(usernameOrEmail);
 
   // Match username or email
   const user = Object.values(users).find(
@@ -175,7 +205,7 @@ export async function authenticateUser(usernameOrEmail, password) {
 // Client-Side Password Reset via Security Question Verification
 export async function resetPassword({ usernameOrEmail, securityAnswer, newPassword }) {
   const users = getRegisteredUsers();
-  const identifier = sanitizeInput(usernameOrEmail.trim().toLowerCase());
+  const identifier = normalizeIdentifier(usernameOrEmail);
 
   const userKey = Object.keys(users).find(
     key => users[key].username === identifier || users[key].email === identifier
@@ -229,9 +259,68 @@ export function clearActiveSession() {
   storage.removeItem(SESSION_STORAGE_KEY);
 }
 
+// Sync an authenticated cloud user into active local session & ensure isolated progress container
+export function syncCloudUserToLocalSession(cloudUser) {
+  if (!cloudUser || !cloudUser.username) return null;
+  const cleanUsername = normalizeIdentifier(cloudUser.username);
+  const sessionObj = {
+    id: cloudUser.id || cloudUser._id || cleanUsername,
+    username: cleanUsername,
+    displayName: cloudUser.profile?.fullName || cloudUser.displayName || cloudUser.username,
+    email: cloudUser.email || '',
+    role: cloudUser.role || 'STUDENT',
+    isCloudAuthenticated: true
+  };
+  setActiveSession(sessionObj);
+  // Ensure progress container exists for this user
+  const existing = getUserProgress(cleanUsername);
+  if (existing) {
+    saveUserProgress(cleanUsername, existing);
+  }
+  return sessionObj;
+}
+
+export function mergeCloudProgressIntoLocal(username, cloudProgress) {
+  if (!username || !cloudProgress) return getUserProgress(username);
+  const cleanUsername = normalizeIdentifier(username);
+  const localProg = getUserProgress(cleanUsername) || {
+    completedChallenges: [],
+    unlockedProgress: {
+      employee_db: { Beginner: 0, Intermediate: 0, Pro: 0 },
+      hospital_db: { Beginner: 0, Intermediate: 0, Pro: 0 }
+    }
+  };
+
+  const cloudSolved = Array.isArray(cloudProgress.solvedQuestions)
+    ? cloudProgress.solvedQuestions
+    : (Array.isArray(cloudProgress.completedChallenges) ? cloudProgress.completedChallenges : []);
+
+  const mergedCompleted = Array.from(new Set([...(localProg.completedChallenges || []), ...cloudSolved]));
+  const cloudUnlocked = cloudProgress.unlockedProgress || {};
+  const localUnlocked = localProg.unlockedProgress || {};
+
+  const mergedUnlocked = {
+    employee_db: {
+      Beginner: Math.max(localUnlocked.employee_db?.Beginner || 0, cloudUnlocked.employee_db?.Beginner || 0),
+      Intermediate: Math.max(localUnlocked.employee_db?.Intermediate || 0, cloudUnlocked.employee_db?.Intermediate || 0),
+      Pro: Math.max(localUnlocked.employee_db?.Pro || 0, cloudUnlocked.employee_db?.Pro || 0)
+    },
+    hospital_db: {
+      Beginner: Math.max(localUnlocked.hospital_db?.Beginner || 0, cloudUnlocked.hospital_db?.Beginner || 0),
+      Intermediate: Math.max(localUnlocked.hospital_db?.Intermediate || 0, cloudUnlocked.hospital_db?.Intermediate || 0),
+      Pro: Math.max(localUnlocked.hospital_db?.Pro || 0, cloudUnlocked.hospital_db?.Pro || 0)
+    }
+  };
+
+  return saveUserProgress(cleanUsername, {
+    completedChallenges: mergedCompleted,
+    unlockedProgress: mergedUnlocked
+  });
+}
+
 // Session-Isolated User Progress Management
 export function getUserProgressKey(username) {
-  return `sql_progress_user_${sanitizeInput(username.toLowerCase())}`;
+  return `sql_progress_user_${normalizeIdentifier(username)}`;
 }
 
 export function getUserProgress(username) {
