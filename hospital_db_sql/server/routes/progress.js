@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import { UserProgress } from '../models/UserProgress.js';
 import { extractUserSession } from '../utils/auth.js';
 
@@ -6,6 +7,10 @@ const router = express.Router();
 
 // Robust in-memory store for environments running without live MongoDB
 const inMemoryProgress = new Map();
+
+function isMongoReady() {
+  return mongoose.connection && mongoose.connection.readyState === 1;
+}
 
 // Extract authentication if present, otherwise set guest context
 router.use(extractUserSession);
@@ -38,7 +43,7 @@ function getInitialProgress(userId) {
 router.get('/', async (req, res) => {
   const userId = resolveUserId(req, req.query.userId);
   try {
-    let progress = await UserProgress.findOne({ userId });
+    let progress = isMongoReady() ? await UserProgress.findOne({ userId }) : null;
     if (!progress) {
       progress = inMemoryProgress.get(userId) || getInitialProgress(userId);
     }
@@ -54,6 +59,9 @@ router.post('/', async (req, res) => {
   const { solvedQuestionId, unlockedProgress, mcqScore, interviewId } = req.body;
 
   try {
+    if (!isMongoReady()) {
+      throw new Error('MongoDB offline');
+    }
     let progress = await UserProgress.findOne({ userId });
     if (!progress) {
       progress = new UserProgress({ userId, solvedQuestions: [] });
@@ -114,6 +122,9 @@ router.post('/sync', async (req, res) => {
   const { completedChallenges = [], unlockedProgress = {}, mcqScores = [] } = req.body;
 
   try {
+    if (!isMongoReady()) {
+      throw new Error('MongoDB offline');
+    }
     let progress = await UserProgress.findOne({ userId });
     if (!progress) {
       progress = new UserProgress({ userId, solvedQuestions: [] });

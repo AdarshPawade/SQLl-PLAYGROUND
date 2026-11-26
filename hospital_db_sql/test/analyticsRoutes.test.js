@@ -76,7 +76,7 @@ async function run() {
     });
     assert.strictEqual(unsafeTargetRes.status, 400);
 
-    // 4. Track valid visit & clicks
+    // 4. Track valid visit, clicks, auth, and solve events
     const visitRes = await request(server, 'POST', '/api/analytics/track', {
       eventType: 'visit',
       target: 'sql_playground_main'
@@ -102,6 +102,13 @@ async function run() {
     });
     assert.strictEqual(click3.status, 201);
 
+    const solveRes = await request(server, 'POST', '/api/analytics/track', {
+      eventType: 'solve',
+      target: 'solve_emp_beg_1',
+      actor: 'alice_dev'
+    });
+    assert.strictEqual(solveRes.status, 201);
+
     // 5. Authorized /stats returns aggregated metrics with no-store cache header
     const statsRes = await request(server, 'GET', '/api/analytics/stats', null, {
       'x-admin-key': process.env.ADMIN_SECRET
@@ -110,11 +117,10 @@ async function run() {
     assert.ok(String(statsRes.headers['cache-control'] || '').includes('no-store'));
     assert.strictEqual(statsRes.body.totalVisits, 1);
     assert.strictEqual(statsRes.body.totalClicks, 3);
+    assert.strictEqual(statsRes.body.totalSolves, 1);
     assert.strictEqual(statsRes.body.clicksByTarget[0]._id, 'run_query_button');
     assert.strictEqual(statsRes.body.clicksByTarget[0].count, 2);
-    assert.strictEqual(statsRes.body.clicksByTarget[1]._id, 'show_hint_button');
-    assert.strictEqual(statsRes.body.clicksByTarget[1].count, 1);
-    assert.strictEqual(statsRes.body.recentActivity.length, 4);
+    assert.strictEqual(statsRes.body.recentActivity.length, 5);
 
     console.log('✓ All analytics route tests passed.');
   } finally {

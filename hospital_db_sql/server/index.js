@@ -70,23 +70,50 @@ app.use(helmet({
 
 app.use(applySecurityHeaders);
 
-// CORS Configuration with trusted origins
-const allowedOrigins = process.env.ALLOWED_ORIGINS 
-  ? process.env.ALLOWED_ORIGINS.split(',') 
-  : ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://localhost:5000'];
+// CORS Configuration with trusted origins + automatic same-origin / Vercel support
+const configuredOrigins = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map(o => o.trim().replace(/\/+$/, ''))
+  .filter(Boolean);
 
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
-      callback(null, true);
-    } else {
-      logger.warn(`CORS Access Blocked for unauthorized origin: ${origin}`);
-      callback(new Error('CORS Access Denied: Unauthorized origin'));
-    }
-  },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Guest-ID', 'X-Admin-Key'],
-  credentials: true
+const defaultDevOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:3000',
+  'http://localhost:5000',
+  'http://localhost:4000'
+];
+
+const vercelOrigins = [
+  process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '',
+  process.env.VERCEL_BRANCH_URL ? `https://${process.env.VERCEL_BRANCH_URL}` : '',
+  process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : ''
+].filter(Boolean);
+
+const allowedOrigins = new Set([...defaultDevOrigins, ...configuredOrigins, ...vercelOrigins]);
+
+app.use(cors((req, callback) => {
+  const origin = req.header('Origin');
+  const cleanOrigin = origin ? origin.replace(/\/+$/, '') : '';
+  const host = req.headers.host;
+  const isSameHost = Boolean(
+    cleanOrigin &&
+    host &&
+    (cleanOrigin === `https://${host}` || cleanOrigin === `http://${host}`)
+  );
+
+  if (!cleanOrigin || isSameHost || allowedOrigins.has(cleanOrigin) || process.env.NODE_ENV !== 'production') {
+    callback(null, {
+      origin: true,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Guest-ID', 'X-Admin-Key'],
+      credentials: true
+    });
+  } else {
+    logger.warn(`CORS Access Blocked for unauthorized origin: ${origin}`);
+    callback(new Error('CORS Access Denied: Unauthorized origin'));
+  }
 }));
 
 // Input Size Limit & Sanitization Middleware

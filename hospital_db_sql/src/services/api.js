@@ -125,6 +125,10 @@ export async function fetchMeApi() {
       credentials: 'include',
       headers: getAuthHeaders()
     });
+    if (res.status === 401) {
+      setStoredAuthToken(null);
+      return { success: false, unauthorized: true };
+    }
     if (!res.ok) return null;
     return await res.json();
   } catch {
@@ -191,6 +195,7 @@ export async function saveUserProgress(progressData) {
   try {
     const res = await fetch(`${API_BASE}/progress`, {
       method: 'POST',
+      credentials: 'include',
       headers: getAuthHeaders(),
       body: JSON.stringify(progressData)
     });
@@ -204,6 +209,7 @@ export async function syncProgressApi(progressPayload) {
   try {
     const res = await fetch(`${API_BASE}/progress/sync`, {
       method: 'POST',
+      credentials: 'include',
       headers: getAuthHeaders(),
       body: JSON.stringify(progressPayload)
     });
@@ -216,6 +222,7 @@ export async function syncProgressApi(progressPayload) {
 export async function fetchUserProgress(userId = 'default_guest') {
   try {
     const res = await fetch(`${API_BASE}/progress?userId=${encodeURIComponent(userId)}`, {
+      credentials: 'include',
       headers: getAuthHeaders()
     });
     return await res.json();

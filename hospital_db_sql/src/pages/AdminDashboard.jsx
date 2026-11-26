@@ -252,9 +252,9 @@ export default function AdminDashboard() {
       </div>
 
       {/* Summary Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: '32px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '28px' }}>
         <div style={{
-          padding: '22px',
+          padding: '20px',
           border: '1px solid rgba(15, 23, 42, 0.1)',
           borderRadius: '12px',
           background: '#ffffff',
@@ -264,13 +264,13 @@ export default function AdminDashboard() {
             <Users size={16} color="#10b981" />
             <span>Total Unique Visits</span>
           </div>
-          <p style={{ fontSize: '2.25rem', fontWeight: 800, margin: '10px 0 0', color: '#0f172a' }}>
+          <p style={{ fontSize: '2.1rem', fontWeight: 800, margin: '10px 0 0', color: '#0f172a' }}>
             {stats.totalVisits}
           </p>
         </div>
 
         <div style={{
-          padding: '22px',
+          padding: '20px',
           border: '1px solid rgba(15, 23, 42, 0.1)',
           borderRadius: '12px',
           background: '#ffffff',
@@ -280,8 +280,40 @@ export default function AdminDashboard() {
             <MousePointerClick size={16} color="#0284c7" />
             <span>Total Button Clicks</span>
           </div>
-          <p style={{ fontSize: '2.25rem', fontWeight: 800, margin: '10px 0 0', color: '#0f172a' }}>
+          <p style={{ fontSize: '2.1rem', fontWeight: 800, margin: '10px 0 0', color: '#0f172a' }}>
             {stats.totalClicks}
+          </p>
+        </div>
+
+        <div style={{
+          padding: '20px',
+          border: '1px solid rgba(15, 23, 42, 0.1)',
+          borderRadius: '12px',
+          background: '#ffffff',
+          boxShadow: '0 4px 16px rgba(15, 23, 42, 0.04)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#475569', fontSize: '0.9rem', fontWeight: 600 }}>
+            <ShieldCheck size={16} color="#7c3aed" />
+            <span>Challenges Solved</span>
+          </div>
+          <p style={{ fontSize: '2.1rem', fontWeight: 800, margin: '10px 0 0', color: '#0f172a' }}>
+            {stats.totalSolves ?? 0}
+          </p>
+        </div>
+
+        <div style={{
+          padding: '20px',
+          border: '1px solid rgba(15, 23, 42, 0.1)',
+          borderRadius: '12px',
+          background: '#ffffff',
+          boxShadow: '0 4px 16px rgba(15, 23, 42, 0.04)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#475569', fontSize: '0.9rem', fontWeight: 600 }}>
+            <Users size={16} color="#f59e0b" />
+            <span>Registered Users ({stats.storageMode === 'mongodb' ? 'DB' : 'Mem'})</span>
+          </div>
+          <p style={{ fontSize: '2.1rem', fontWeight: 800, margin: '10px 0 0', color: '#0f172a' }}>
+            {stats.totalUsers ?? 0}
           </p>
         </div>
       </div>

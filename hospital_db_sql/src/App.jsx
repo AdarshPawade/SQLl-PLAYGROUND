@@ -15,6 +15,7 @@ import { trackEvent } from './utils/tracker';
 
 import {
   getActiveSession,
+  clearActiveSession,
   getUserProgress,
   saveUserProgress,
   syncCloudUserToLocalSession,
@@ -158,7 +159,14 @@ function SqlPlaygroundStudio() {
     let cancelled = false;
     (async () => {
       const meRes = await fetchMeApi();
-      if (cancelled || !meRes?.success || !meRes.user) return;
+      if (cancelled) return;
+      if (meRes?.unauthorized) {
+        clearActiveSession();
+        setCurrentUser(null);
+        loadProgressForSession(null);
+        return;
+      }
+      if (!meRes?.success || !meRes.user) return;
 
       const sessionUser = syncCloudUserToLocalSession(meRes.user);
       if (!sessionUser) return;
@@ -305,6 +313,9 @@ function SqlPlaygroundStudio() {
   };
 
   const handleSelectQuestion = (question) => {
+    if (question?.id) {
+      trackEvent('click', `select_question_${question.id}`);
+    }
     setActiveQuestion(question);
     setUserSql(question.initialQuery || '');
     setMobilePracticeTab('editor');
@@ -329,6 +340,7 @@ function SqlPlaygroundStudio() {
     setUserQueryExecuted(true);
 
     if (result.isMatch) {
+      trackEvent('solve', `solve_${activeQuestion.id}`);
       // Mark question as solved
       const newSolved = new Set(solvedQuestionIds).add(activeQuestion.id);
       setSolvedQuestionIds(newSolved);

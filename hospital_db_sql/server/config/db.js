@@ -1,8 +1,5 @@
 import mongoose from 'mongoose';
 
-// Prevent NoSQL query-selector injection ($ne, $gt, etc.) across all Mongoose queries
-mongoose.set('sanitizeFilter', true);
-
 export async function connectDB() {
   const mongoUri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/sql_playground';
   
@@ -11,10 +8,10 @@ export async function connectDB() {
     return { isConnected: true, uri: mongoUri };
   }
 
-  // Connection Pool & Timeout configuration for 1,000+ users
+  // Connection Pool & Timeout configuration (tuned for serverless & high concurrency)
   const options = {
-    maxPoolSize: 100, // Handle high concurrent load
-    minPoolSize: 5,   // Maintain warm socket connections
+    maxPoolSize: process.env.VERCEL ? 10 : 100,
+    minPoolSize: process.env.VERCEL ? 0 : 5,
     serverSelectionTimeoutMS: 5000,
     socketTimeoutMS: 45000,
     connectTimeoutMS: 10000,

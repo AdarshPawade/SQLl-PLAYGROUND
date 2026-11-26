@@ -16,7 +16,19 @@ export function getAnalyticsApiBase() {
   return '/api/analytics';
 }
 
-export const trackEvent = (eventType, target) => {
+function getCurrentActorUsername() {
+  try {
+    if (typeof localStorage === 'undefined') return 'guest';
+    const raw = localStorage.getItem('sql_playground_active_session_v1');
+    if (!raw) return 'guest';
+    const parsed = JSON.parse(raw);
+    return parsed?.username ? String(parsed.username).slice(0, 64) : 'guest';
+  } catch {
+    return 'guest';
+  }
+}
+
+export const trackEvent = (eventType, target, actorOverride = null) => {
   if (!eventType || !target) return;
 
   // Never log tracking events from the hidden admin route
@@ -25,12 +37,13 @@ export const trackEvent = (eventType, target) => {
   }
 
   const apiBase = getAnalyticsApiBase();
+  const actor = actorOverride || getCurrentActorUsername();
 
   // Fire-and-forget request so it never blocks the UI
   fetch(`${apiBase}/track`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ eventType, target }),
+    body: JSON.stringify({ eventType, target, actor }),
     keepalive: true
   }).catch(() => {}); // Silently ignore errors if user uses an ad-blocker or offline
 };
