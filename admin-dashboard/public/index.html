@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>SQL Playground — Visitor &amp; User Analytics</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="login-view" class="auth-shell">
+    <div class="auth-card">
+      <div class="badge">EXTERNAL ANALYTICS</div>
+      <h1>SQL Playground Dashboard</h1>
+      <p class="subtitle">Monitor total site visitors and registered users cleanly—no user activity tracking.</p>
+
+      <form id="login-form">
+        <label for="backend-url">Backend URL</label>
+        <input
+          id="backend-url"
+          type="url"
+          placeholder="https://your-app.vercel.app or http://localhost:5000"
+          value="http://localhost:5000"
+          required
+        />
+
+        <label for="admin-key">Admin Secret Key</label>
+        <input
+          id="admin-key"
+          type="password"
+          placeholder="Enter ADMIN_SECRET"
+          autocomplete="current-password"
+          required
+        />
+
+        <button id="unlock-btn" type="submit" class="btn-primary">Unlock Dashboard</button>
+      </form>
+
+      <p id="login-error" class="error-box hidden"></p>
+    </div>
+  </div>
+
+  <div id="dashboard-view" class="dash-shell hidden">
+    <header class="dash-header">
+      <div>
+        <div class="badge">ANALYTICS OVERVIEW</div>
+        <h1>Visitors &amp; Registered Users</h1>
+        <p id="connected-target" class="subtitle"></p>
+      </div>
+
+      <div class="header-actions">
+        <span id="storage-pill" class="pill">Checking DB...</span>
+        <label class="auto-refresh-toggle">
+          <input id="auto-refresh" type="checkbox" checked />
+          <span>Auto-refresh (10s)</span>
+        </label>
+        <button id="refresh-btn" type="button" class="btn-secondary">Refresh</button>
+        <button id="lock-btn" type="button" class="btn-danger">Lock</button>
+      </div>
+    </header>
+
+    <section class="kpi-grid">
+      <div class="kpi-card kpi-visits">
+        <span class="kpi-label">Total Visitors</span>
+        <strong id="kpi-visits" class="kpi-value">0</strong>
+        <div class="kpi-meta">
+          <span>Today: <strong id="kpi-visits-today">0</strong></span>
+          <span>Last 7 Days: <strong id="kpi-visits-7d">0</strong></span>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-users">
+        <span class="kpi-label">Registered Users</span>
+        <strong id="kpi-users" class="kpi-value">0</strong>
+        <div class="kpi-meta">
+          <span>Today: <strong id="kpi-users-today">0</strong></span>
+          <span>Last 7 Days: <strong id="kpi-users-7d">0</strong></span>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-conversion">
+        <span class="kpi-label">Visitor → Signup Rate</span>
+        <strong id="kpi-conversion" class="kpi-value">0%</strong>
+        <div class="conversion-track">
+          <div id="conversion-fill" class="conversion-fill" style="width: 0%;"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Last 7 Days — Daily Counts</h2>
+        <div class="legend">
+          <span class="legend-item"><i class="dot dot-visit"></i> Visitors</span>
+          <span class="legend-item"><i class="dot dot-user"></i> New Registrations</span>
+        </div>
+      </div>
+
+      <div id="chart-bars" class="chart-bars"></div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Date (UTC)</th>
+              <th class="right">Visitors</th>
+              <th class="right">New Registered Users</th>
+            </tr>
+          </thead>
+          <tbody id="daily-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

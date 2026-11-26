@@ -1,0 +1,10 @@
+{
+  "name": "sql-playground-admin-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Standalone external admin analytics & user monitoring dashboard for SQL Playground",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
