@@ -771,7 +771,10 @@ export default function AuthSystem({ currentUser: propUser, onSessionChange, onN
             <div className="stat-card liquid-card">
               <Layers className="w-6 h-6 text-emerald-400 mb-2" />
               <div className="stat-value">
-                {(userProgress?.unlockedProgress?.employee_db?.Beginner || 0) + (userProgress?.unlockedProgress?.hospital_db?.Beginner || 0)}
+                {['employee_db', 'hospital_db'].reduce((sum, db) => {
+                  const lvlMap = userProgress?.unlockedProgress?.[db] || {};
+                  return sum + (lvlMap.Beginner || 0) + (lvlMap.Intermediate || 0) + (lvlMap.Pro || 0);
+                }, 0)}
               </div>
               <div className="stat-label">Unlocked Level Progress</div>
             </div>

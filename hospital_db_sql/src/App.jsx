@@ -547,6 +547,7 @@ function SqlPlaygroundStudio() {
             />
 
             <SchemaSidebar
+              key={activeDbKey}
               activeDbKey={activeDbKey}
               activeSchemaInfo={activeSchemaInfo}
               dbInstance={dbInstance}

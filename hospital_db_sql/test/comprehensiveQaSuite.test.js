@@ -111,7 +111,8 @@ function validateSubmission(cachedSQL, userQuery, expectedQuery, verificationQue
 
     const expectedExec = executeQueryNode(expectedDb, expectedQuery);
 
-    const isDdlDml = /^\s*(CREATE|INSERT|UPDATE|DELETE|DROP|ALTER|REPLACE|TRUNCATE|WITH|PREPARE)/i.test(userQuery.trim());
+    const cleanedSql = userQuery.replace(/^\s*--.*$/gm, '').trim();
+    const isDdlDml = /^\s*(CREATE|INSERT|UPDATE|DELETE|DROP|ALTER|REPLACE|TRUNCATE|PREPARE)/i.test(cleanedSql);
 
     let userResult = userExec;
     let expectedResult = expectedExec;

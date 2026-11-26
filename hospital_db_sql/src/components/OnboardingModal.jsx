@@ -72,7 +72,7 @@ export default function OnboardingModal({ isOpen, onClose, onSelectTrack, onOpen
                 </div>
                 <div className="track-info">
                   <h4>Tech & Product SQL</h4>
-                  <p>Employee DB: 30 challenges covering DDL, DML, Joins, and aggregations.</p>
+                  <p>Employee DB: 80 challenges covering DDL, DML, Joins, Window Functions &amp; CTEs.</p>
                 </div>
                 {selectedTrack === 'fullstack' && <CheckCircle2 className="w-5 h-5 text-emerald-400 check-icon" />}
               </div>
@@ -86,7 +86,7 @@ export default function OnboardingModal({ isOpen, onClose, onSelectTrack, onOpen
                 </div>
                 <div className="track-info">
                   <h4>Healthcare & Clinical SQL</h4>
-                  <p>Hospital DB: Admissions, Smart Equipment telemetry, doctors & rooms.</p>
+                  <p>Hospital DB: 80 challenges on Admissions, Smart Equipment telemetry, doctors &amp; patients.</p>
                 </div>
                 {selectedTrack === 'healthcare' && <CheckCircle2 className="w-5 h-5 text-cyan-400 check-icon" />}
               </div>
@@ -141,9 +141,10 @@ export default function OnboardingModal({ isOpen, onClose, onSelectTrack, onOpen
               </div>
               <div className="terminal-code">
                 <code>
-                  <span className="sql-keyword">SELECT</span> department_name, <span className="sql-keyword">COUNT</span>(*) <span className="sql-keyword">AS</span> total_staff<br/>
-                  <span className="sql-keyword">FROM</span> employees<br/>
-                  <span className="sql-keyword">GROUP BY</span> department_name<br/>
+                  <span className="sql-keyword">SELECT</span> d.department_name, <span className="sql-keyword">COUNT</span>(*) <span className="sql-keyword">AS</span> total_staff<br/>
+                  <span className="sql-keyword">FROM</span> employees e<br/>
+                  <span className="sql-keyword">JOIN</span> departments d <span className="sql-keyword">ON</span> e.department_id = d.department_id<br/>
+                  <span className="sql-keyword">GROUP BY</span> d.department_name<br/>
                   <span className="sql-keyword">ORDER BY</span> total_staff <span className="sql-keyword">DESC</span>;
                 </code>
               </div>
@@ -163,7 +164,7 @@ export default function OnboardingModal({ isOpen, onClose, onSelectTrack, onOpen
                 <div className="query-preview-result animate-fade">
                   <div className="result-header">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    <span>Query Output: 3 rows returned in 4ms</span>
+                    <span>Query Output: 4 rows returned in 4ms</span>
                   </div>
                   <table className="mini-result-table">
                     <thead>
@@ -174,16 +175,20 @@ export default function OnboardingModal({ isOpen, onClose, onSelectTrack, onOpen
                     </thead>
                     <tbody>
                       <tr>
-                        <td>Engineering</td>
-                        <td>4</td>
-                      </tr>
-                      <tr>
-                        <td>Marketing</td>
+                        <td>engineering</td>
                         <td>2</td>
                       </tr>
                       <tr>
-                        <td>Human Resources</td>
-                        <td>2</td>
+                        <td>human resources</td>
+                        <td>1</td>
+                      </tr>
+                      <tr>
+                        <td>sales &amp; marketing</td>
+                        <td>1</td>
+                      </tr>
+                      <tr>
+                        <td>finance &amp; it</td>
+                        <td>1</td>
                       </tr>
                     </tbody>
                   </table>
