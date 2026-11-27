@@ -3,7 +3,7 @@
 
 An interactive web-based SQL playground built with the **MERN** stack, designed for practicing SQL queries, exploring database schemas, and running commands against pre-loaded sample datasets such as a hospital management database. 
 
-Live Demo: https://sq-ll-playground.vercel.app 
+Live Demo: https://sqlpractice-playground.vercel.app 
 
 # Overview
 
