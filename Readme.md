@@ -16,6 +16,7 @@ Live Demo: https://sqlpractice-playground.vercel.app
 * **Instant Results & Error Feedback:** View formatted query outputs or clear SQL syntax and execution error messages in real time.
 * Full-Stack Persistence (MERN):** Save query history, user workspaces, or custom snippets using MongoDB and Express.
 * Responsive Web Interface:** Built with React for a clean, fast, and distraction-free coding experience.
+* with user authentication and autorization
 
 # Tech Stack
 
